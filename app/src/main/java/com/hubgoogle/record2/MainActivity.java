@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -27,6 +29,13 @@ public class MainActivity extends Activity {
     private TextView storageStatus;
     private Button audioButton;
     private Button locationButton;
+    private final Handler updates = new Handler(Looper.getMainLooper());
+    private final Runnable updateTask = new Runnable() {
+        @Override public void run() {
+            if (audioButton != null) refresh();
+            updates.postDelayed(this, 2000);
+        }
+    };
     private final int navy = Color.rgb(26, 42, 70);
     private final int teal = Color.rgb(0, 132, 126);
 
@@ -169,7 +178,13 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        updates.removeCallbacks(updateTask);
         if (audioButton != null) refresh();
+        updates.postDelayed(updateTask, 2000);
+    }
+    @Override protected void onPause() {
+        updates.removeCallbacks(updateTask);
+        super.onPause();
     }
     private void refresh() {
         audioStatus.setText(AudioRecordService.running ? "● 錄音進行中（有系統通知）" : "○ 未錄音");
