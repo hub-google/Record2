@@ -30,11 +30,17 @@ jobs:
         with:
           name: Record2-debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules || true
+          sudo udevadm trigger --name-match=kvm || true
       - name: Emulator smoke tests and screenshots
         id: emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
+          emulator-boot-timeout: 360
           target: google_apis
           arch: x86_64
           profile: pixel_6
