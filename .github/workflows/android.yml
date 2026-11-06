@@ -1,0 +1,55 @@
+name: Android build and emulator screenshots
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/test-evidence/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Source checks
+        run: bash scripts/test-static.sh
+      - name: Compile debug APK
+        run: gradle --no-daemon :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Record2-debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Emulator smoke tests and screenshots
+        id: emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-snapshot -camera-back emulated -camera-front emulated -gpu swiftshader_indirect
+          script: bash scripts/emulator-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Record2-test-evidence
+          path: docs/test-evidence/
+      - name: Commit emulator screenshots to repo
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/test-evidence
+          if ! git diff --cached --quiet; then
+            git commit -m "test: add Android emulator operation screenshots [skip ci]"
+            git push
+          fi
