@@ -100,3 +100,25 @@
 3. **#42543281609**：完整 CI **SUCCESS**，包含麥克風及相機權限明確拒絕測試。
 
 **結論：本輪 Android 15 模擬器回歸測試通過，但不表示已完成所有實機、所有版本的功能驗收。**
+
+## 2026-11-09 最新回歸驗收（後續版本；以本節為準）
+
+- **正式依據**：[Android 15 全流程測試 — Run 42569471579](https://github.com/hub-google/Record2/actions/runs/42569471579) → **SUCCESS**。
+- **跨版本依據**：[Android API 26、29、34 — Run 42567323144](https://github.com/hub-google/Record2/actions/runs/42567323144) → **三個 Job 均 SUCCESS**。
+- 先前報告中標示「檔案匯出／刪除尚未驗證」是舊版紀錄，本輪已完成對應模擬器實測，不應再將其當成最新狀態。
+
+| 測試項目 | 最新結果 | 可核對證據 |
+|---|---|---|
+| Android Debug APK 編譯 | PASS | Actions Job |
+| 麥克風錄音／M4A 檔案／播放頁面 | PASS（API35） | CI 日誌、`02-recording.png`、`07-audio-library.png` |
+| GPS 定位、相機預覽、JPEG 拍照 | PASS（API35） | CI 日誌、`03-location.png`、`04-camera.png`、`05-photo.png` |
+| JPEG／M4A 從系統檔案選擇器真正匯出 | **PASS** | CI 日誌明確指出匯出到 Downloads 後與來源 **byte-for-byte 一致**；`13-photo-exported.png`、`14-audio-exported.png` |
+| 取消匯出、取消刪除／確認刪除 | **PASS** | CI 日誌、`11-photo-deleted.png`、`12-audio-deleted.png` |
+| 拒絕麥克風／相機權限 | PASS | `09-permission-denied.png`、CI 服務狀態檢查 |
+| 切離 App 後錄音仍繼續、並儲存 M4A | **PASS（短時間）** | `15-background-audio-home.png`、`15-background-audio-service.txt`、CI 內的音檔大小檢查 |
+| 切離 App 後定位服務仍持續、更新新 GPS 座標 | **PASS（短時間）** | `16-background-location-home.png`、`16-background-location-service.txt`、`16-background-events.jsonl` |
+| Android 8、10、14 核心流程 | PASS（模擬器） | API 26／29／34 各自 CI artifact |
+| 真機跨品牌、長時間待機／省電／重啟恢復 | **尚未驗證** | 無實機證據，不能宣稱已通過 |
+| 隱形安裝／無提示攝錄、所有版本機型通用 | **未實作／無法保證** | 不屬於目前授權式 App 的功能 |
+
+**此版結論**：可見授權式 Android 感測紀錄 App 的上述模擬器測試通過，但原始要求中的隱形、完全無系統提示、所有機型保證仍未達成；不得將模擬器短時間測試表述為正式跨品牌實機驗收。

@@ -36,7 +36,14 @@
 - **相機**：需可見預覽的拍照與 JPEG 儲存。
 - **檔案**：播放、預覽、匯出（Storage Access Framework）、取消／確認刪除、本機事件。
 - **資料與安全**：無雲端帳號、無網路權限、資料預設留在 App 儲存目錄。
-- **驗收**：測試計畫 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，實際測試證據 [docs/test-evidence/](docs/test-evidence/)，最新已成功執行的 [Android 15 操作測試](https://github.com/hub-google/Record2/actions/runs/42567323148) 與 [Android 8／10／14 相容性測試](https://github.com/hub-google/Record2/actions/runs/42567323144)。
+- **驗收**：測試計畫 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，實際測試證據 [docs/test-evidence/](docs/test-evidence/)，最新已成功執行的 [Android 15 完整操作與背景運作測試](https://github.com/hub-google/Record2/actions/runs/42569471579) 與 [Android 8／10／14 相容性測試](https://github.com/hub-google/Record2/actions/runs/42567323144)。
+
+### 0.4 最新驗證結果（2026-11-09）
+
+- Android 15／API 35 的 GitHub Actions Run [42569471579](https://github.com/hub-google/Record2/actions/runs/42569471579) 為 **SUCCESS**：錄音、定位、相機、檔案儲存、檔案真實匯出、刪除與拒絕權限均通過。
+- **切至手機首頁後仍持續運作的可見前景服務**已實測：錄音切換背景約 12 秒仍保存 M4A；定位切至背景後注入新座標，約 35 秒後確認位置事件寫入。證據見 [背景錄音截圖](docs/test-evidence/15-background-audio-home.png)、[背景定位截圖](docs/test-evidence/16-background-location-home.png) 與 [GPS 事件紀錄](docs/test-evidence/16-background-events.jsonl)。
+- Android 8／10／14 模擬器核心功能的相容性測試：[42567323144](https://github.com/hub-google/Record2/actions/runs/42567323144) **SUCCESS**。
+- **未涵蓋**：所有品牌／版本實體手機、長時間鎖屏、省電政策、遠端操控、隱藏使用或規避任何系統指示。短時間背景測試不能推論全天候可靠性。
 
 ### 0.3 尚未完成、不可宣稱完成的部分
 
