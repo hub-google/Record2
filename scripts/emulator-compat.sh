@@ -64,10 +64,21 @@ sleep 2
 adb shell ls "/sdcard/Android/data/$APP/files/audio" | grep -q '\.m4a'
 adb exec-out screencap -p > "$OUT/api$API-audio-saved.png"
 echo "PASS: API $API audio saved"
+# Android 8 location providers may take longer to initialize after setting mode.
+adb shell settings put secure location_mode 3 || true
+adb emu geo fix 121.5654 25.0330 || true
+sleep 5
 tap_text '開始定位'
-sleep 3
+sleep 5
 if ! dump_ui || ! grep -q '停止定位' "$DUMP"; then
   echo "FAIL: location foreground service did not start on API $API"
+  adb exec-out screencap -p > "$OUT/api$API-location-failed.png" || true
+  adb shell dumpsys location > "$OUT/api$API-dumpsys-location.txt" || true
+  adb shell settings get secure location_mode > "$OUT/api$API-location-mode.txt" || true
+  adb shell dumpsys activity services "$APP" > "$OUT/api$API-services.txt" || true
+  adb logcat -d -t 6000 > "$OUT/api$API-location-logcat.txt" || true
+  adb pull "/sdcard/Android/data/$APP/files/events/events.jsonl" "$OUT/api$API-events.jsonl" >/dev/null 2>&1 || true
+  cp "$DUMP" "$OUT/api$API-location-failed.xml" || true
   exit 1
 fi
 adb emu geo fix 121.5654 25.0330 || true
