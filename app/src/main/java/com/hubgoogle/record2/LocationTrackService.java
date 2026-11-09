@@ -10,6 +10,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Bundle;
 import android.os.Looper;
 import java.util.Locale;
 
@@ -70,6 +71,16 @@ public class LocationTrackService extends Service implements LocationListener {
                 location.getLatitude(), location.getLongitude(), location.getAccuracy());
         getSharedPreferences("position", MODE_PRIVATE).edit().putString("last", latLon).apply();
         Store.event(this, "location_point", latLon + " provider=" + location.getProvider());
+    }
+
+    // Android 8.x requires these legacy LocationListener methods.
+    // Their interface default implementations exist only on newer Android SDKs.
+    @Override public void onStatusChanged(String provider, int status, Bundle extras) {
+        // Provider state is handled by onProviderDisabled and active subscriptions.
+    }
+
+    @Override public void onProviderEnabled(String provider) {
+        Store.event(this, "location_provider_enabled", provider);
     }
 
     @Override public void onProviderDisabled(String provider) {
