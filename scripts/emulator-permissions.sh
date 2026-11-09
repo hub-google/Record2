@@ -2,12 +2,13 @@
 set -euo pipefail
 APP=com.hubgoogle.record2
 # The Android 15 emulator should not start sensors when permissions were revoked.
-adb shell am start -n "$APP/.MainActivity" >/dev/null
+adb shell am force-stop "$APP"
 adb shell pm revoke "$APP" android.permission.RECORD_AUDIO
 adb shell pm revoke "$APP" android.permission.CAMERA
 adb shell pm revoke "$APP" android.permission.ACCESS_FINE_LOCATION
 adb shell pm revoke "$APP" android.permission.ACCESS_COARSE_LOCATION
-sleep 1
+adb shell am start -n "$APP/.MainActivity" >/dev/null
+sleep 2
 adb shell uiautomator dump /sdcard/window.xml >/dev/null
 adb shell cat /sdcard/window.xml | grep -q '開始錄音'
 # Explicit denial via Android system permission dialogue rather than broad UI bypasses.
