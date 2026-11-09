@@ -1,11 +1,13 @@
 package com.hubgoogle.record2;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
@@ -92,6 +94,8 @@ public final class RemoteControlService extends Service {
 
     /** Can only be called from app UI; the network server exposes no equivalent method. */
     public static boolean resolve(Context context, String id, boolean approved) {
+        // Old notifications must never authorize work after the service was disabled.
+        if (!running) return false;
         Request request;
         synchronized (LOCK) {
             request = REQUESTS.get(id);
@@ -140,6 +144,15 @@ public final class RemoteControlService extends Service {
             return START_NOT_STICKY;
         }
         if (accepting) return START_NOT_STICKY;
+        // Explicitly-visible remote control must not run when the user has
+        // denied Android 13+ notifications, which would suppress its notice.
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED) {
+            Store.event(this, "remote_denied", "Notification permission required for visible control");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         createChannel();
         try {
             Notification notice = new Notification.Builder(this, CHANNEL)
@@ -341,10 +354,14 @@ public final class RemoteControlService extends Service {
             try { listener.close(); } catch (Exception ignored) {}
             listener = null;
         }
+        NotificationManager manager = getSystemService(NotificationManager.class);
         synchronized (LOCK) {
             for (Request request : REQUESTS.values()) {
                 if ("pending".equals(request.status)) request.status = "cancelled";
+                manager.cancel(request.id.hashCode());
             }
+            // A restarted session must not expose stale approvals or request ids.
+            REQUESTS.clear();
         }
         Store.event(this, "remote_stopped", "Local-only listener stopped");
         super.onDestroy();
