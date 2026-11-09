@@ -1,11 +1,6 @@
 name: Android multi-version compatibility
+# 開發階段僅手動執行；功能完成後再集中測試。
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'scripts/emulator-compat.sh'
-      - '.github/workflows/compatibility.yml'
   workflow_dispatch:
 concurrency:
   group: record2-${{ github.workflow }}-${{ github.ref }}
