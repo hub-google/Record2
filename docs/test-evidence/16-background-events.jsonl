@@ -1,0 +1,15 @@
+{"at":1794203577216,"type":"audio_started","detail":"20261109_055256_396_25e2f970.m4a"}
+{"at":1794203583572,"type":"audio_saved","detail":"20261109_055256_396_25e2f970.m4a"}
+{"at":1794203587918,"type":"location_started","detail":"Subscribed providers: 2"}
+{"at":1794203591665,"type":"location_point","detail":"25.033000, 121.565398 (±5m) provider=gps"}
+{"at":1794203600049,"type":"location_stopped","detail":"Location tracking stopped"}
+{"at":1794203615443,"type":"photo_saved","detail":"20261109_055335_289_0fcb2c5d.jpg"}
+{"at":1794203669436,"type":"file_exported","detail":"20261109_055335_289_0fcb2c5d.jpg"}
+{"at":1794203700090,"type":"file_deleted","detail":"20261109_055335_289_0fcb2c5d.jpg"}
+{"at":1794203715918,"type":"file_exported","detail":"20261109_055256_396_25e2f970.m4a"}
+{"at":1794203726146,"type":"file_deleted","detail":"20261109_055256_396_25e2f970.m4a"}
+{"at":1794203761840,"type":"audio_started","detail":"20261109_055601_739_ef9b94bb.m4a"}
+{"at":1794203781529,"type":"audio_saved","detail":"20261109_055601_739_ef9b94bb.m4a"}
+{"at":1794203785655,"type":"location_started","detail":"Subscribed providers: 2"}
+{"at":1794203789737,"type":"location_point","detail":"25.050000, 121.599998 (±5m) provider=gps"}
+{"at":1794203827554,"type":"location_stopped","detail":"Location tracking stopped"}
