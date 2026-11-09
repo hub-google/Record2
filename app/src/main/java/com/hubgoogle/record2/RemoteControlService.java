@@ -26,7 +26,6 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -71,6 +70,14 @@ public final class RemoteControlService extends Service {
         android.content.SharedPreferences pref = context.getSharedPreferences(PREFS, MODE_PRIVATE);
         String existing = pref.getString("token", null);
         if (existing != null && existing.matches("[0-9a-f]{64}")) return existing;
+        String created = generateToken();
+        if (!pref.edit().putString("token", created).commit()) {
+            throw new IllegalStateException("Cannot securely store access token");
+        }
+        return created;
+    }
+
+    private static String generateToken() {
         byte[] secret = new byte[32];
         new SecureRandom().nextBytes(secret);
         char[] alphabet = "0123456789abcdef".toCharArray();
@@ -79,17 +86,26 @@ public final class RemoteControlService extends Service {
             hex[2 * i] = alphabet[(secret[i] >>> 4) & 15];
             hex[2 * i + 1] = alphabet[secret[i] & 15];
         }
-        String created = new String(hex);
-        if (!pref.edit().putString("token", created).commit()) {
-            throw new IllegalStateException("Cannot securely store access token");
-        }
-        return created;
+        return new String(hex);
     }
 
     public static synchronized void rotateToken(Context context) {
-        context.getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("token").commit();
-        token(context);
-        Store.event(context, "remote_token_rotated", "Local access token changed");
+        // Replace in one committed transaction; never leave an unintended
+        // previous key valid if storage fails.
+        String replacement = generateToken();
+        if (!context.getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit().putString("token", replacement).commit()) {
+            throw new IllegalStateException("Cannot rotate access token");
+        }
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        synchronized (LOCK) {
+            for (Request request : REQUESTS.values()) {
+                if ("pending".equals(request.status)) request.status = "cancelled";
+                manager.cancel(request.id.hashCode());
+            }
+            REQUESTS.clear();
+        }
+        Store.event(context, "remote_token_rotated", "Local access token changed and requests revoked");
     }
 
     /** Can only be called from app UI; the network server exposes no equivalent method. */
@@ -280,6 +296,9 @@ public final class RemoteControlService extends Service {
             }
             Store.event(this, "remote_requested", action);
             prompt(request);
+            // A pending request cannot leave a stale approval notification
+            // visible indefinitely when the user doesn't interact.
+            stopTimer.postDelayed(() -> expireRequest(request.id), REQUEST_LIFETIME_MS);
             JSONObject accepted = new JSONObject();
             accepted.put("id", request.id);
             accepted.put("status", "pending");
@@ -305,6 +324,17 @@ public final class RemoteControlService extends Service {
             respond(output, 200, data); return;
         }
         respond(output, 404, error("Endpoint unavailable"));
+    }
+
+    private void expireRequest(String id) {
+        Request request;
+        synchronized (LOCK) {
+            request = REQUESTS.get(id);
+            if (request == null || !"pending".equals(request.status)) return;
+            request.status = "expired";
+        }
+        getSystemService(NotificationManager.class).cancel(id.hashCode());
+        Store.event(this, "remote_expired", request.action);
     }
 
     private static boolean validAction(String action) {
