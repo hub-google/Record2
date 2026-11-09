@@ -10,14 +10,36 @@ adb shell pm grant "$APP" android.permission.CAMERA
 adb shell pm grant "$APP" android.permission.ACCESS_FINE_LOCATION
 adb shell pm grant "$APP" android.permission.ACCESS_COARSE_LOCATION
 adb shell pm grant "$APP" android.permission.POST_NOTIFICATIONS || true
-adb shell am start -n "$APP/.MainActivity"
-# Wait until the Activity is displayed; a fixed sleep can capture Android splash instead.
-for attempt in $(seq 1 25); do
+# Emulator cold-boot screens, first-launch transitions and package-manager grants are
+# not synchronized. Explicitly wake/unlock and collect diagnostics on failure.
+adb shell input keyevent KEYCODE_WAKEUP || true
+adb shell wm dismiss-keyguard || true
+adb shell am force-stop "$APP" || true
+adb shell am start -W -n "$APP/.MainActivity" || true
+home_ready=false
+for attempt in $(seq 1 45); do
   adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-  if adb shell cat /sdcard/window.xml | grep -q '開始錄音'; then break; fi
-  sleep 1
+  if adb shell cat /sdcard/window.xml 2>/dev/null | grep -q '開始錄音'; then
+    home_ready=true
+    break
+  fi
+  if ((attempt % 10 == 0)); then
+    echo "Waiting for Record2 home screen ($attempt/45)"
+    adb shell input keyevent KEYCODE_WAKEUP || true
+    adb shell wm dismiss-keyguard || true
+    adb shell am start -n "$APP/.MainActivity" || true
+  fi
+  sleep 2
 done
-adb shell cat /sdcard/window.xml | grep -q '開始錄音' || { echo 'Home screen not ready'; exit 1; }
+if [[ "$home_ready" != true ]]; then
+  echo 'FAIL: Home screen not ready; collecting emulator diagnostics'
+  adb exec-out screencap -p > docs/test-evidence/00-startup-failure.png || true
+  adb logcat -d -t 6000 > docs/test-evidence/startup-logcat.txt || true
+  adb shell dumpsys activity activities > docs/test-evidence/startup-activity.txt || true
+  adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/window.xml docs/test-evidence/startup-window.xml || true
+  exit 1
+fi
 sleep 2
 adb exec-out screencap -p > docs/test-evidence/01-home.png
 click_text() {
