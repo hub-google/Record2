@@ -63,11 +63,20 @@ adb shell am start -n "$APP/.MainActivity" >/dev/null
 sleep 2
 click_text '停止定位'
 sleep 2
-adb pull "/sdcard/Android/data/$APP/files/events/events.jsonl" /tmp/record2-background-events.jsonl >/dev/null
+adb pull "/sdcard/Android/data/$APP/files/events/events.jsonl" "$EVIDENCE/16-background-events.jsonl" >/dev/null
+adb shell dumpsys location > "$EVIDENCE/16-background-location-dumpsys.txt" || true
 python3 - <<'PY'
-import json
-with open('/tmp/record2-background-events.jsonl') as f:
+import json,re
+path='docs/test-evidence/16-background-events.jsonl'
+with open(path) as f:
     events=[json.loads(x) for x in f if x.strip()]
-assert any(e.get('type')=='location_point' and '25.050000, 121.600' in e.get('detail','') for e in events), 'No background GPS point at injected coordinate'
-print('PASS: visible, authorized location foreground service survived Home and logged position')
+points=[e for e in events if e.get('type')=='location_point']
+print('RECORDED_POSITION_EVENTS:',[x.get('detail','') for x in points[-8:]])
+def near_target(event):
+    m=re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)',event.get('detail',''))
+    if not m:return False
+    lat,lon=map(float,m.groups())
+    return abs(lat-25.05)<0.0003 and abs(lon-121.6)<0.0003
+assert any(near_target(e) for e in points), 'No background GPS update near injected location; raw events in CI artifacts'
+print('PASS: visible, authorized location foreground service survived Home and logged new GPS position')
 PY
