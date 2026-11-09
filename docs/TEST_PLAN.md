@@ -65,3 +65,38 @@
 | R10 | 切換前背景／相機旋轉／多次重開 | 相機資源釋放且不當機；需實機覆核 |
 
 自動化新增 `scripts/emulator-permissions.sh`，其輸出與螢幕截圖會保留到 `docs/test-evidence/`。**此區段是測試設計，不是通過證明。**
+
+
+## 2026-11-09 實際回歸測試報告（最終 CI）
+
+- **執行紀錄**：[GitHub Actions #42543281609](https://github.com/hub-google/Record2/actions/runs/42543281609)
+- **執行提交**：`3096c7c42e03fa1841458af2ee61ebba88238dab`
+- **結果**：GitHub Actions Job **SUCCESS**（完整編譯、Android API 35 模擬器腳本執行、證據上傳成功）
+- **平台**：Android 15／API 35 x86_64 Google APIs Emulator、JDK 17、Gradle 8.11.1
+- **APK**：Actions Artifacts → `Record2-debug-APK`
+- **測試檔**：Actions Artifacts → `Record2-test-evidence`；共 **9 張真實模擬器 PNG**，已同步提交 `docs/test-evidence/`。
+- **錯誤日誌**：`docs/test-evidence/error-log.txt` 是空檔，只代表該腳本的 Logcat 過濾條件未擷取錯誤，不能據此保證沒有任何潛在問題。
+
+| 測試項目 | 結果 | 證據與限制 |
+|---|---|---|
+| Debug APK 編譯／安裝／啟動 | **PASS** | GitHub Actions build + ADB 安裝、開啟首頁 |
+| 錄音啟動與停止 | **PASS** | [02 錄音進行中](test-evidence/02-recording.png)、[06 儲存後計數](test-evidence/06-saved-files.png) |
+| M4A 檔案有實際內容 | **PASS（基本格式）** | ADB 抽取檔案並驗證 `ftyp`／`moov`／`mdat`。**ffprobe 因 runner 未安裝而 SKIP，未驗證音訊品質** |
+| 錄音列表與播放器 | **PASS（操作）** | [07 錄音檔案清單](test-evidence/07-audio-library.png)，呼叫 Android MediaPlayer 後顯示播放提示；未進行聽感與音質量測 |
+| GPS 位置與停止 | **PASS（模擬座標）** | [03 定位](test-evidence/03-location.png)、[06 返回首頁](test-evidence/06-saved-files.png)；注入 `25.033000, 121.565398`，不是實際戶外移動驗證 |
+| 相機開啟、拍照、關閉 | **PASS** | [04 相機預覽](test-evidence/04-camera.png)、[05 拍照](test-evidence/05-photo.png) |
+| JPEG 格式與本機預覽 | **PASS** | ADB 驗證 JPEG 標記 + BitmapFactory 真實解碼，[08 照片預覽](test-evidence/08-photo-preview.png) |
+| 拒絕麥克風／相機授權 | **PASS** | `pm revoke` 後經 Android 權限對話框選拒絕，確認沒有錄音服務或相機 Activity 啟動，[09 拒絕後畫面](test-evidence/09-permission-denied.png) |
+| 使用者選擇位置匯出檔案 | **尚未驗證** | `ACTION_CREATE_DOCUMENT` 介面已實作；需實機完成 DocumentsUI 操作、外部目錄確認 |
+| 刪除確認／取消與多筆資料 | **尚未驗證** | 程式邏輯已實作，需另做完整操作測試 |
+| 長時間背景執行／省電策略／螢幕鎖定 | **尚未驗證** | Android 廠牌／省電政策差異大 |
+| Android 8–14 與多機型 | **尚未驗證** | 本輪僅測 Android 15／API 35 模擬器 |
+| 音訊實際可聽性、無損、電話錄音 | **尚未驗證／非功能保證** | 這版採麥克風 AAC/M4A，不是電話上／下行音訊直錄或無損錄音 |
+
+### 本輪失敗修正紀錄
+
+1. **#42542293029**：主功能與檔案結構驗證通過；拒絕權限腳本因在權限撤銷後沒有正確重啟 App 而取得不到 UI root。已修正成先 `force-stop`、撤銷權限，再啟動。
+2. **#42542744007**：模擬器冷啟動後首頁在等待時間內未可見，加入喚醒、解鎖、較完整重試及失敗時擷取 Logcat／螢幕截圖的診斷。
+3. **#42543281609**：完整 CI **SUCCESS**，包含麥克風及相機權限明確拒絕測試。
+
+**結論：本輪 Android 15 模擬器回歸測試通過，但不表示已完成所有實機、所有版本的功能驗收。**
