@@ -19,21 +19,25 @@ adb shell am start -W -n "$APP/.MainActivity" || true
 home_ready=false
 for attempt in $(seq 1 45); do
   adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-  # Google APIs emulator may raise an unrelated first-boot googleSDKSetup ANR
-  # that obscures an otherwise healthy Record2 home screen.
-  if adb shell cat /sdcard/window.xml 2>/dev/null | grep -q 'com.google.android.googlesdksetup'; then
-    echo 'Detected Google emulator setup ANR dialog; closing unrelated system process'
+  # Dismiss only Android's unrelated system-process ANR. An ANR owned by
+  # Record2 is a product failure and must not be masked as a test success.
+  if adb shell cat /sdcard/window.xml 2>/dev/null | grep -q 'android:id/aerr_close'; then
     adb pull /sdcard/window.xml /tmp/record2-anr-window.xml >/dev/null 2>&1 || true
     python3 - <<'PY'
 import re, subprocess, xml.etree.ElementTree as ET
 try:
-    for n in ET.parse('/tmp/record2-anr-window.xml').getroot().iter('node'):
-        if n.attrib.get('text') == 'Close app':
-            x1,y1,x2,y2 = map(int,re.findall(r'\d+',n.attrib['bounds']))
-            subprocess.check_call(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)])
-            break
-except (OSError, ValueError, ET.ParseError) as ex:
-    print('Unable to dismiss system setup ANR:',ex)
+    nodes=list(ET.parse('/tmp/record2-anr-window.xml').getroot().iter('node'))
+    title=next((n.attrib.get('text','') for n in nodes if n.attrib.get('resource-id')=='android:id/alertTitle'),'')
+    if 'Record2' in title:
+        raise RuntimeError('Record2 itself is not responding: '+title)
+    if "isn't responding" not in title and 'not responding' not in title:
+        raise RuntimeError('Unexpected Android error dialog: '+title)
+    btn=next(n for n in nodes if n.attrib.get('resource-id')=='android:id/aerr_close')
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',btn.attrib['bounds']))
+    print('Closing unrelated Android system process:',title)
+    subprocess.check_call(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)])
+except Exception as ex:
+    raise SystemExit('FAIL: '+str(ex))
 PY
     sleep 2
   fi

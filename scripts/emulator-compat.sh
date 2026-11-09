@@ -34,16 +34,17 @@ PY
 ready=false
 for i in $(seq 1 35); do
   if dump_ui && grep -q '開始錄音' "$DUMP"; then ready=true; break; fi
-  if [[ -f "$DUMP" ]] && grep -q 'com.google.android.googlesdksetup' "$DUMP"; then
+  if [[ -f "$DUMP" ]] && grep -q 'android:id/aerr_close' "$DUMP"; then
     python3 - "$DUMP" <<'PY'
 import sys,re,subprocess,xml.etree.ElementTree as ET
-try:
-    for node in ET.parse(sys.argv[1]).getroot().iter('node'):
-        if node.attrib.get('text')=='Close app':
-            x1,y1,x2,y2=map(int,re.findall(r'\d+',node.attrib['bounds']))
-            subprocess.run(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)])
-            break
-except Exception as ex: print('System overlay:',ex)
+nodes=list(ET.parse(sys.argv[1]).getroot().iter('node'))
+title=next((n.attrib.get('text','') for n in nodes if n.attrib.get('resource-id')=='android:id/alertTitle'),'')
+if 'Record2' in title or ("isn't responding" not in title and 'not responding' not in title):
+    raise SystemExit('FAIL: unexpected ANR '+title)
+btn=next(n for n in nodes if n.attrib.get('resource-id')=='android:id/aerr_close')
+x1,y1,x2,y2=map(int,re.findall(r'\d+',btn.attrib['bounds']))
+print('Closing system-process ANR:',title)
+subprocess.check_call(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)])
 PY
   fi
   if ((i % 12 == 0)); then adb shell am start -n "$APP/.MainActivity" || true; fi
