@@ -2,6 +2,9 @@ package com.hubgoogle.record2;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -29,6 +32,9 @@ public class MainActivity extends Activity {
     private TextView storageStatus;
     private Button audioButton;
     private Button locationButton;
+    private Button remoteButton;
+    private TextView remoteStatus;
+    private boolean remotePromptShowing;
     private final Handler updates = new Handler(Looper.getMainLooper());
     private final Runnable updateTask = new Runnable() {
         @Override public void run() {
@@ -97,6 +103,25 @@ public class MainActivity extends Activity {
         main.addView(cameraButton);
         main.addView(gap(20));
 
+        main.addView(text("遠端請求（需要手機同意）", 20, navy, true));
+        main.addView(text("預設關閉、只監聽手機本機位址，經 ADB 轉送連線；每次錄音、定位或相機請求都必須在手機確認。沒有自動傳輸音檔、照片或位置資訊。", 13, Color.DKGRAY, false));
+        main.addView(gap(8));
+        remoteStatus = text("遠端請求未啟用", 14, navy, false);
+        main.addView(remoteStatus);
+        main.addView(gap(8));
+        remoteButton = button("啟用遠端請求", teal);
+        remoteButton.setOnClickListener(v -> toggleRemote());
+        main.addView(remoteButton);
+        main.addView(gap(8));
+        Button tokenButton = button("查看連線金鑰與使用方式", navy);
+        tokenButton.setOnClickListener(v -> showRemoteInstructions());
+        main.addView(tokenButton);
+        main.addView(gap(8));
+        Button resetButton = button("重新產生遠端金鑰", navy);
+        resetButton.setOnClickListener(v -> confirmTokenReset());
+        main.addView(resetButton);
+        main.addView(gap(20));
+
         main.addView(text("本機資料", 20, navy, true));
         storageStatus = text("", 14, Color.DKGRAY, false);
         main.addView(storageStatus);
@@ -123,6 +148,109 @@ public class MainActivity extends Activity {
         });
         main.addView(docsButton);
         refresh();
+    }
+
+    private void toggleRemote() {
+        if (RemoteControlService.running) {
+            stopService(new Intent(this, RemoteControlService.class));
+            toast("已要求關閉遠端請求");
+            remoteButton.postDelayed(this::refresh, 500);
+            return;
+        }
+        try {
+            RemoteControlService.token(this);
+            startForegroundService(new Intent(this, RemoteControlService.class)
+                    .setAction(RemoteControlService.START));
+            toast("正在啟動本機遠端請求服務");
+        } catch (Exception ex) {
+            toast("遠端請求無法啟動：" + ex.getMessage());
+        }
+        remoteButton.postDelayed(this::refresh, 800);
+    }
+
+    private void showRemoteInstructions() {
+        String secret;
+        try { secret = RemoteControlService.token(this); }
+        catch (Exception ex) { toast("無法產生金鑰"); return; }
+        String message = "僅當手機使用者啟用服務時有效。\n" +
+                "先在電腦執行：adb forward tcp:8765 tcp:8765\n\n" +
+                "本機 API：http://127.0.0.1:8765/v1/status\n" +
+                "請求方式：POST /v1/requests/audio_start\n" +
+                "可用動作：audio_start、audio_stop、location_start、location_stop、camera_open\n" +
+                "每次操作仍需在手機明確核准。\n\n" +
+                "連線金鑰（請勿分享）：\n" + secret;
+        new AlertDialog.Builder(this)
+                .setTitle("遠端請求連線說明")
+                .setMessage(message)
+                .setNegativeButton("關閉", null)
+                .setPositiveButton("複製金鑰", (d, which) -> {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Record2 臨時存取金鑰", secret));
+                    toast("金鑰已複製；使用後請清除剪貼簿");
+                }).show();
+    }
+
+    private void confirmTokenReset() {
+        new AlertDialog.Builder(this)
+                .setTitle("重新產生金鑰？")
+                .setMessage("舊金鑰立即失效，遠端請求服務也會關閉；重新啟用前不接受新請求。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("重新產生", (d, which) -> {
+                    stopService(new Intent(this, RemoteControlService.class));
+                    RemoteControlService.rotateToken(this);
+                    toast("遠端金鑰已更新");
+                    remoteButton.postDelayed(this::refresh, 500);
+                }).show();
+    }
+
+    private void checkRemoteRequest() {
+        if (remotePromptShowing || isFinishing() || !RemoteControlService.running) return;
+        RemoteControlService.Request request = RemoteControlService.firstPending();
+        if (request == null) return;
+        remotePromptShowing = true;
+        new AlertDialog.Builder(this)
+                .setTitle("允許遠端操作？")
+                .setMessage("此要求來自已連線的用戶端：\n\n" +
+                        RemoteControlService.actionLabel(request.action) +
+                        "\n\n同意後仍會遵循 Android 系統權限及感測器提示；不同意將不執行任何操作。")
+                .setNegativeButton("拒絕", (d, which) -> {
+                    RemoteControlService.resolve(this, request.id, false);
+                    remotePromptShowing = false;
+                })
+                .setPositiveButton("同意並執行", (d, which) -> {
+                    boolean approved = RemoteControlService.resolve(this, request.id, true);
+                    remotePromptShowing = false;
+                    if (approved) executeApprovedRemoteAction(request.action);
+                })
+                .setOnCancelListener(d -> {
+                    RemoteControlService.resolve(this, request.id, false);
+                    remotePromptShowing = false;
+                }).show();
+    }
+
+    private void executeApprovedRemoteAction(String action) {
+        switch (action) {
+            case "audio_start":
+                if (!AudioRecordService.running) toggleAudio();
+                else toast("錄音已經在執行中");
+                break;
+            case "audio_stop":
+                if (AudioRecordService.running) toggleAudio();
+                else toast("目前沒有錄音");
+                break;
+            case "location_start":
+                if (!LocationTrackService.running) toggleLocation();
+                else toast("定位已經在執行中");
+                break;
+            case "location_stop":
+                if (LocationTrackService.running) toggleLocation();
+                else toast("目前沒有定位");
+                break;
+            case "camera_open":
+                openCamera();
+                break;
+            default: toast("不支援此遠端操作");
+        }
     }
 
     private void toggleAudio() {
@@ -202,6 +330,13 @@ public class MainActivity extends Activity {
         audioButton.setText(AudioRecordService.running ? "停止錄音" : "開始錄音");
         locationButton.setText(LocationTrackService.running ? "停止定位" : "開始定位");
         storageStatus.setText(Store.summary(this));
+        if (remoteButton != null) {
+            remoteButton.setText(RemoteControlService.running ? "關閉遠端請求" : "啟用遠端請求");
+            remoteStatus.setText(RemoteControlService.running ?
+                    "● 已啟用（本機 127.0.0.1:8765，有可見通知）" :
+                    "○ 未啟用；不接受遠端請求");
+            checkRemoteRequest();
+        }
     }
 
     private TextView text(String s, int sp, int color, boolean bold) {

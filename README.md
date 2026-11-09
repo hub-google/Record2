@@ -35,7 +35,7 @@
 - **定位**：前景服務、GPS／Network Provider、位置與時間事件紀錄。
 - **相機**：需可見預覽的拍照與 JPEG 儲存。
 - **檔案**：播放、預覽、匯出（Storage Access Framework）、取消／確認刪除、本機事件。
-- **資料與安全**：無雲端帳號、無網路權限、資料預設留在 App 儲存目錄。
+- **資料與安全**：無雲端帳號，資料預設留在 App 儲存目錄。遠端請求功能需手機使用者手動啟用，新增的網路權限僅用於手機 **127.0.0.1 本機回環介面**，預設不建立連線、不上傳音檔或位置。
 - **驗收**：測試計畫 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，實際測試證據 [docs/test-evidence/](docs/test-evidence/)，最新已成功執行的 [Android 15 完整操作與背景運作測試](https://github.com/hub-google/Record2/actions/runs/42569471579) 與 [Android 8／10／14 相容性測試](https://github.com/hub-google/Record2/actions/runs/42567323144)。
 
 ### 0.4 最新驗證結果（2026-11-09）
@@ -43,7 +43,7 @@
 - Android 15／API 35 的 GitHub Actions Run [42569471579](https://github.com/hub-google/Record2/actions/runs/42569471579) 為 **SUCCESS**：錄音、定位、相機、檔案儲存、檔案真實匯出、刪除與拒絕權限均通過。
 - **切至手機首頁後仍持續運作的可見前景服務**已實測：錄音切換背景約 12 秒仍保存 M4A；定位切至背景後注入新座標，約 35 秒後確認位置事件寫入。證據見 [背景錄音截圖](docs/test-evidence/15-background-audio-home.png)、[背景定位截圖](docs/test-evidence/16-background-location-home.png) 與 [GPS 事件紀錄](docs/test-evidence/16-background-events.jsonl)。
 - Android 8／10／14 模擬器核心功能的相容性測試：[42567323144](https://github.com/hub-google/Record2/actions/runs/42567323144) **SUCCESS**。
-- **未涵蓋**：所有品牌／版本實體手機、長時間鎖屏、省電政策、遠端操控、隱藏使用或規避任何系統指示。短時間背景測試不能推論全天候可靠性。
+- **未涵蓋**：所有品牌／版本實體手機、長時間鎖屏、省電政策、未經每次確認的遠端操作、隱藏使用或規避任何系統指示。短時間背景測試不能推論全天候可靠性。
 
 ### 0.3 尚未完成、不可宣稱完成的部分
 
@@ -91,10 +91,22 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 
 首頁新增「管理錄音與照片」：列出最近 40 筆錄音或照片；錄音可播放／停止播放，照片可預覽，兩種檔案均可透過 Android 的**儲存檔案**選擇器匯出並可確認後刪除。
 
-檔案匯出使用 Android Storage Access Framework 的 `ACTION_CREATE_DOCUMENT`，**不需要全裝置儲存權限**。未選擇匯出時，不會自行上傳或分享。App 不要求網路權限。照片使用縮圖解碼以降低記憶體佔用；音訊播放器在離開頁面後停止。
+檔案匯出使用 Android Storage Access Framework 的 `ACTION_CREATE_DOCUMENT`，**不需要全裝置儲存權限**。未選擇匯出時，不會自行上傳或分享。新增遠端請求只在使用者主動啟用後監聽 127.0.0.1，需網路權限但不連外部伺服器，也不開放音檔下載 API。照片使用縮圖解碼以降低記憶體佔用；音訊播放器在離開頁面後停止。
 
 測試範圍擴充為檔案清單、音訊格式／照片驗證、照片預覽，以及 Android 系統明確拒絕麥克風與相機授權後不會自行啟動的測試。詳見 `docs/TEST_PLAN.md`。實際 PASS/FAIL 以 GitHub Actions 內容為準。
 
 ## GitHub 開源方案調查（2026-11-09）
 
 已檢查 AndroidMCP、OwnTracks、Haven 及 RustDesk 的遠端控制、背景定位及感測器功能。詳細比較、原始碼授權、Android 官方限制與可參考的授權式實作方向，請見 **[docs/OPEN_SOURCE_ASSESSMENT.md](docs/OPEN_SOURCE_ASSESSMENT.md)**。此文件是技術研究，不代表已整合；原始隱形／無提示條件仍屬未達成。
+
+## 免 ROOT 遠端請求整合（2026-11-09）
+
+參考 AndroidMCP 的「能力預設關閉／每次敏感要求須由手機持有人核准」及 OwnTracks 的使用者可見定位運作方式，Record2 新增 **本機回環式遠端操作請求**：
+
+- 預設關閉，使用者在主畫面按「啟用遠端請求」後才會啟用有通知的服務；只繫結 `127.0.0.1:8765`，無 LAN 監聽或公網伺服器。
+- 電腦透過使用者自行授權的 `adb forward` 建立轉送，再以隨機 256-bit 金鑰向 API 發出操作請求；不會自動配對、遠端安裝或偷偷啟用。
+- 支援請求 **開始／停止錄音、開始／停止定位、開啟可見相機預覽**。手機用戶必須對每次請求按「同意並執行」或「拒絕」；相機需保持可見頁面及 Android 權限機制。API 的 `approved_to_attempt` 僅表示使用者核准操作嘗試，需再查 `/v1/status` 確認實際服務狀態。
+- 金鑰可在手機主動查看／重新產生；拒絕或逾時不會執行。最多 3 個待核准請求，90 秒自動過期，服務啟動 15 分鐘後自動停止。遠端客戶端**不能自行批准自己的要求**。
+- 遠端介面**不傳輸實際 GPS 座標、音檔、照片，亦不提供遠端自動拍攝或隱藏感測器指示的 API**。
+
+完整操作說明、安全界線與測試：**[docs/REMOTE_BRIDGE.md](docs/REMOTE_BRIDGE.md)**；最初的隱形／無提示／所有機型通用條件仍**未達成**。
