@@ -34,6 +34,17 @@ public class MediaLibraryActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (state != null) {
+            String savedCategory = state.getString("selectedCategory");
+            if ("audio".equals(savedCategory) || "photos".equals(savedCategory)) category = savedCategory;
+            String savedExportName = state.getString("pendingExportName");
+            if (savedExportName != null) {
+                // Match only our own media files; never restore an arbitrary file path.
+                for (File file : Store.mediaFiles(this, category)) {
+                    if (file.getName().equals(savedExportName)) { pendingExport = file; break; }
+                }
+            }
+        }
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(Color.rgb(245, 248, 252));
         LinearLayout content = new LinearLayout(this);
@@ -160,7 +171,8 @@ public class MediaLibraryActivity extends Activity {
             view.setAdjustViewBounds(true);
             view.setPadding(dp(8), dp(8), dp(8), dp(8));
             new AlertDialog.Builder(this).setTitle(file.getName()).setView(view)
-                    .setPositiveButton("關閉", (d, w) -> bitmap.recycle()).show();
+                    .setPositiveButton("關閉", null)
+                    .setOnDismissListener(d -> bitmap.recycle()).show();
         } catch (Exception ex) { toast("無法檢視圖片：" + ex.getMessage()); }
     }
 
@@ -194,6 +206,11 @@ public class MediaLibraryActivity extends Activity {
         } catch (Exception ex) { toast("匯出失敗：" + ex.getMessage()); }
     }
 
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("selectedCategory", category);
+        if (pendingExport != null) outState.putString("pendingExportName", pendingExport.getName());
+    }
     @Override protected void onPause() { stopPlayback(); super.onPause(); }
     private Button button(String text) { Button b = new Button(this); b.setText(text); b.setAllCaps(false); b.setTextSize(13); return b; }
     private TextView label(String text, int sp) { TextView t = new TextView(this); t.setText(text); t.setTextSize(sp); t.setTextColor(Color.rgb(26, 42, 70)); return t; }

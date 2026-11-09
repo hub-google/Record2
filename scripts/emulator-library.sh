@@ -60,11 +60,36 @@ import xml.etree.ElementTree as E
 nodes=list(E.parse('/tmp/record2-library.xml').getroot().iter('node'))
 print('DOCUMENT_PICKER_UI:',[x.attrib.get('text','') for x in nodes if x.attrib.get('text')])
 PY
-# Cancel intentionally; verifying user cancellation does not modify the original.
+# Verify the actual SAF file write, not only the picker opening.
+tap_text 'SAVE'
+sleep 3
+assert_text '照片：1 個'
+mkdir -p /tmp/record2-export-original /tmp/record2-exported
+adb pull "/sdcard/Android/data/$APP/files/photos/$PHOTO" /tmp/record2-export-original/ >/dev/null
+download_photo=false
+for attempt in $(seq 1 15); do
+  if adb pull "/sdcard/Download/$PHOTO" /tmp/record2-exported/ >/dev/null 2>&1; then
+    download_photo=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$download_photo" != true ]]; then
+  echo "FAIL: document picker did not save photo to Downloads"
+  adb shell ls -al /sdcard/Download || true
+  exit 1
+fi
+cmp "/tmp/record2-export-original/$PHOTO" "/tmp/record2-exported/$PHOTO"
+adb exec-out screencap -p > docs/test-evidence/13-photo-exported.png
+echo 'PASS: SAF photo export saved identical JPEG bytes to Downloads'
+
+# Check that canceling the document picker leaves the original unchanged.
+tap_text '匯出'
+sleep 2
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 assert_text '照片：1 個'
-echo 'PASS: export opens Android document picker; cancel leaves original photo unchanged'
+echo 'PASS: cancel export leaves original photo unchanged'
 # Deletion requires confirmation. Verify cancel preserves the file.
 tap_text '刪除'
 sleep 1
@@ -93,6 +118,27 @@ sleep 1
 assert_text '錄音：1 個'
 AUDIO=$(adb shell ls "/sdcard/Android/data/$APP/files/audio" | tr -d '\r' | grep -E '\.m4a$' | head -1)
 test -n "$AUDIO"
+tap_text '匯出'
+sleep 3
+tap_text 'SAVE'
+sleep 3
+assert_text '錄音：1 個'
+adb pull "/sdcard/Android/data/$APP/files/audio/$AUDIO" /tmp/record2-export-original/ >/dev/null
+download_audio=false
+for attempt in $(seq 1 15); do
+  if adb pull "/sdcard/Download/$AUDIO" /tmp/record2-exported/ >/dev/null 2>&1; then
+    download_audio=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$download_audio" != true ]]; then
+  echo 'FAIL: document picker did not save audio to Downloads'
+  exit 1
+fi
+cmp "/tmp/record2-export-original/$AUDIO" "/tmp/record2-exported/$AUDIO"
+adb exec-out screencap -p > docs/test-evidence/14-audio-exported.png
+echo 'PASS: SAF audio export saved identical M4A bytes to Downloads'
 tap_text '刪除'
 sleep 1
 tap_text '刪除'
