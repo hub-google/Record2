@@ -27,6 +27,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_AUDIO = 201;
     private static final int REQUEST_LOCATION = 202;
     private static final int REQUEST_CAMERA = 203;
+    private static final int REQUEST_REMOTE_NOTIFICATIONS = 205;
     private TextView audioStatus;
     private TextView locationStatus;
     private TextView storageStatus;
@@ -157,6 +158,12 @@ public class MainActivity extends Activity {
             remoteButton.postDelayed(this::refresh, 500);
             return;
         }
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            toast("遠端服務需要顯示明確通知，請先允許通知權限");
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_REMOTE_NOTIFICATIONS);
+            return;
+        }
         try {
             RemoteControlService.token(this);
             startForegroundService(new Intent(this, RemoteControlService.class)
@@ -197,8 +204,12 @@ public class MainActivity extends Activity {
                 .setNegativeButton("取消", null)
                 .setPositiveButton("重新產生", (d, which) -> {
                     stopService(new Intent(this, RemoteControlService.class));
-                    RemoteControlService.rotateToken(this);
-                    toast("遠端金鑰已更新");
+                    try {
+                        RemoteControlService.rotateToken(this);
+                        toast("遠端金鑰已更新，舊的待核准要求也已撤銷");
+                    } catch (RuntimeException ex) {
+                        toast("無法更新金鑰，請檢查裝置儲存空間");
+                    }
                     remoteButton.postDelayed(this::refresh, 500);
                 }).show();
     }
@@ -310,6 +321,7 @@ public class MainActivity extends Activity {
         else if (code == REQUEST_LOCATION && (granted ||
                 checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) toggleLocation();
         else if (code == REQUEST_CAMERA && granted) openCamera();
+        else if (code == REQUEST_REMOTE_NOTIFICATIONS && granted) toggleRemote();
         else if (code != 204) toast("需要授權才能使用此功能");
         refresh();
     }
