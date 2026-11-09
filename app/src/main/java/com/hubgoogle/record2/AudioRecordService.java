@@ -59,18 +59,25 @@ public class AudioRecordService extends Service {
 
     private void releaseRecorder(boolean save) {
         boolean finished = false;
-        if (recorder != null) {
-            if (save && running) {
-                try { recorder.stop(); finished = true; }
-                catch (RuntimeException ex) { Store.event(this, "audio_error", "Recorder stop failed"); }
+        MediaRecorder previous = recorder;
+        recorder = null;
+        if (previous != null) {
+            try {
+                if (save && running) {
+                    previous.stop();
+                    finished = true;
+                }
+            } catch (RuntimeException ex) {
+                Store.event(this, "audio_error", "Recorder stop failed: " + ex.getMessage());
+            } finally {
+                try { previous.reset(); } catch (RuntimeException ignored) {}
+                try { previous.release(); } catch (RuntimeException ignored) {}
             }
-            recorder.reset();
-            recorder.release();
-            recorder = null;
         }
         running = false;
-        if (finished && currentFile != null) Store.event(this, "audio_saved", currentFile.getName());
-        else if (currentFile != null && currentFile.exists()) {
+        if (finished && currentFile != null && currentFile.length() > 0) {
+            Store.event(this, "audio_saved", currentFile.getName());
+        } else if (currentFile != null && currentFile.exists()) {
             if (!currentFile.delete()) android.util.Log.w("Record2", "Cannot remove failed recording");
         }
         currentFile = null;

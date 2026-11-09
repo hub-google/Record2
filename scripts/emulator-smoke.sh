@@ -73,3 +73,46 @@ for name in ('01-home.png','02-recording.png','03-location.png','04-camera.png',
     assert p.exists() and p.stat().st_size>1000, name
 print('PASS: six screenshots captured from Android emulator')
 PY
+
+# Regression: real playback, JPEG decode, and in-app file access.
+click_text '管理錄音與照片'
+sleep 2
+adb shell uiautomator dump /sdcard/window.xml >/dev/null
+adb shell cat /sdcard/window.xml | grep -q '錄音：1' || { echo 'Audio library did not show saved audio'; exit 1; }
+click_text '播放'
+sleep 1
+adb exec-out screencap -p > docs/test-evidence/07-audio-library.png
+click_text '照片清單'
+sleep 1
+adb shell uiautomator dump /sdcard/window.xml >/dev/null
+adb shell cat /sdcard/window.xml | grep -q '照片：1' || { echo 'Photo library did not show saved photo'; exit 1; }
+click_text '檢視'
+sleep 1
+adb shell uiautomator dump /sdcard/window.xml >/dev/null
+adb shell cat /sdcard/window.xml | grep -q '關閉' || { echo 'Photo preview dialog did not open'; exit 1; }
+adb exec-out screencap -p > docs/test-evidence/08-photo-preview.png
+click_text '關閉'
+
+# Validate underlying bytes: MP4 atoms + JPEG markers; no assumption that a file count is sufficient.
+mkdir -p /tmp/record2-media
+adb pull /sdcard/Android/data/$APP/files/audio /tmp/record2-media/ >/dev/null
+adb pull /sdcard/Android/data/$APP/files/photos /tmp/record2-media/ >/dev/null
+python3 - <<'PY'
+from pathlib import Path
+base=Path('/tmp/record2-media')
+audio=list((base/'audio').glob('*.m4a'))
+photos=list((base/'photos').glob('*.jpg'))
+assert len(audio)==1 and len(photos)==1, (audio,photos)
+a=audio[0].read_bytes()
+assert len(a)>1500 and a[4:8]==b'ftyp', 'recording is not an MP4/M4A container'
+assert b'moov' in a and b'mdat' in a, 'M4A audio lacks required media atoms'
+p=photos[0].read_bytes()
+assert len(p)>1000 and p.startswith(b'\xff\xd8\xff') and p.endswith(b'\xff\xd9'), 'JPEG is invalid'
+print('PASS: M4A container structure and JPEG signatures verified')
+PY
+if command -v ffprobe >/dev/null 2>&1; then
+  ffprobe -v error -select_streams a -show_entries stream=codec_name -of default=noprint_wrappers=1 /tmp/record2-media/audio/*.m4a | grep -q 'codec_name=aac'
+  echo 'PASS: M4A decoded as AAC by ffprobe'
+else
+  echo 'SKIP: ffprobe not available (M4A container structure verified)'
+fi

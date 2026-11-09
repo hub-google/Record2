@@ -18,6 +18,7 @@ public class LocationTrackService extends Service implements LocationListener {
     public static final String STOP = "com.hubgoogle.record2.location.STOP";
     public static volatile boolean running = false;
     private LocationManager locationManager;
+    private int subscribedProviders;
 
     @Override public IBinder onBind(Intent intent) { return null; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -41,14 +42,22 @@ public class LocationTrackService extends Service implements LocationListener {
                 startForeground(102, Notifications.active(this, "Record2 正在記錄位置", "點擊返回停止"));
             }
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            subscribedProviders = 0;
             if (fine && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000L, 25f, this, Looper.getMainLooper());
+                subscribedProviders++;
             }
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+            if ((fine || coarse) && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000L, 25f, this, Looper.getMainLooper());
+                subscribedProviders++;
+            }
+            if (subscribedProviders == 0) {
+                Store.event(this, "location_error", "No enabled location providers");
+                stopSelf();
+                return START_NOT_STICKY;
             }
             running = true;
-            Store.event(this, "location_started", "Waiting for enabled location providers");
+            Store.event(this, "location_started", "Subscribed providers: " + subscribedProviders);
         } catch (Exception ex) {
             Store.event(this, "location_error", ex.getClass().getSimpleName() + ": " + ex.getMessage());
             stopSelf();
@@ -63,8 +72,18 @@ public class LocationTrackService extends Service implements LocationListener {
         Store.event(this, "location_point", latLon + " provider=" + location.getProvider());
     }
 
+    @Override public void onProviderDisabled(String provider) {
+        Store.event(this, "location_provider_disabled", provider);
+        if (locationManager != null &&
+                !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) &&
+                !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) stopSelf();
+    }
+
     @Override public void onDestroy() {
-        if (locationManager != null) locationManager.removeUpdates(this);
+        if (locationManager != null) {
+            try { locationManager.removeUpdates(this); }
+            catch (RuntimeException ex) { android.util.Log.w("Record2", "Cannot unsubscribe location", ex); }
+        }
         running = false;
         Store.event(this, "location_stopped", "Location tracking stopped");
         super.onDestroy();

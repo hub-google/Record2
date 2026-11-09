@@ -39,6 +39,13 @@ public class CameraActivity extends Activity {
     private Handler handler;
     private String cameraId;
     private TextView hint;
+    private Button captureButton;
+    private Surface previewSurface;
+    private android.util.Size previewSize;
+    private boolean active;
+    private volatile boolean opening;
+    private volatile int cameraGeneration;
+    private int jpegOrientation;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,11 +60,12 @@ public class CameraActivity extends Activity {
         layout.addView(hint);
         textureView = new TextureView(this);
         layout.addView(textureView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        Button capture = new Button(this);
-        capture.setText("拍照並儲存");
-        capture.setAllCaps(false);
-        capture.setOnClickListener(v -> capturePhoto());
-        layout.addView(capture);
+        captureButton = new Button(this);
+        captureButton.setText("拍照並儲存");
+        captureButton.setAllCaps(false);
+        captureButton.setEnabled(false);
+        captureButton.setOnClickListener(v -> capturePhoto());
+        layout.addView(captureButton);
         Button close = new Button(this);
         close.setText("關閉相機");
         close.setAllCaps(false);
@@ -74,19 +82,23 @@ public class CameraActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        active = true;
         thread = new HandlerThread("Record2Camera");
         thread.start();
         handler = new Handler(thread.getLooper());
         if (textureView.isAvailable()) openCamera();
     }
     @Override protected void onPause() {
+        active = false;
+        cameraGeneration++;
+        opening = false;
         closeCamera();
         if (thread != null) { thread.quitSafely(); thread = null; handler = null; }
         super.onPause();
     }
 
     private void openCamera() {
-        if (camera != null || handler == null) return;
+        if (!active || camera != null || opening || handler == null) return;
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             hint.setText("相機權限尚未授權");
             return;
@@ -106,11 +118,44 @@ public class CameraActivity extends Activity {
                 hint.setText("此相機不支援 JPEG 拍攝"); return;
             }
             android.util.Size[] sizes = map.getOutputSizes(android.graphics.ImageFormat.JPEG);
-            android.util.Size selected = sizes[0];
-            for (android.util.Size s : sizes) {
-                if (s.getWidth() * s.getHeight() <= 2000000L &&
-                        s.getWidth() * s.getHeight() > selected.getWidth() * (long) selected.getHeight()) selected = s;
+            if (sizes.length == 0) { showError("沒有可用的 JPEG 尺寸"); return; }
+            android.util.Size selected = null;
+            for (android.util.Size size : sizes) {
+                long pixels = (long) size.getWidth() * size.getHeight();
+                if (pixels <= 2000000L && (selected == null || pixels > (long) selected.getWidth() * selected.getHeight())) {
+                    selected = size;
+                }
             }
+            if (selected == null) {
+                selected = sizes[0];
+                for (android.util.Size size : sizes) {
+                    if ((long) size.getWidth() * size.getHeight() < (long) selected.getWidth() * selected.getHeight()) selected = size;
+                }
+            }
+            android.util.Size[] previews = map.getOutputSizes(SurfaceTexture.class);
+            previewSize = null;
+            for (android.util.Size size : previews == null ? new android.util.Size[0] : previews) {
+                long pixels = (long) size.getWidth() * size.getHeight();
+                if (pixels <= 1920L * 1080L && (previewSize == null ||
+                    pixels > (long) previewSize.getWidth() * previewSize.getHeight())) previewSize = size;
+            }
+            if (previewSize == null && previews != null && previews.length > 0) {
+                previewSize = previews[0];
+                for (android.util.Size size : previews) {
+                    if ((long) size.getWidth() * size.getHeight() <
+                        (long) previewSize.getWidth() * previewSize.getHeight()) previewSize = size;
+                }
+            }
+            if (previewSize == null) previewSize = new android.util.Size(640, 480);
+            Integer sensorOrientation = manager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.SENSOR_ORIENTATION);
+            int rotation = getWindowManager().getDefaultDisplay().getRotation();
+            int deviceDegrees = rotation == Surface.ROTATION_90 ? 90 : rotation == Surface.ROTATION_180 ? 180 :
+                    rotation == Surface.ROTATION_270 ? 270 : 0;
+            Integer direction = manager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.LENS_FACING);
+            int sign = direction != null && direction == CameraCharacteristics.LENS_FACING_FRONT ? -1 : 1;
+            jpegOrientation = ((sensorOrientation == null ? 0 : sensorOrientation) + deviceDegrees * sign + 360) % 360;
             reader = ImageReader.newInstance(selected.getWidth(), selected.getHeight(),
                     android.graphics.ImageFormat.JPEG, 2);
             reader.setOnImageAvailableListener(r -> {
@@ -124,26 +169,43 @@ public class CameraActivity extends Activity {
                     File photo = Store.newFile(this, "photos", ".jpg");
                     try (FileOutputStream stream = new FileOutputStream(photo)) { stream.write(bytes); }
                     Store.event(this, "photo_saved", photo.getName());
-                    runOnUiThread(() -> Toast.makeText(this, "照片已儲存", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> {
+                        if (active) {
+                            captureButton.setEnabled(true);
+                            Toast.makeText(this, "照片已儲存", Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 } catch (Exception e) {
                     Store.event(this, "photo_error", e.getMessage());
+                    showError("照片儲存失敗：" + e.getMessage());
+                    runOnUiThread(() -> { if (active) captureButton.setEnabled(true); });
                 } finally { if (image != null) image.close(); }
             }, handler);
+            opening = true;
+            final int requestGeneration = cameraGeneration;
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override public void onOpened(CameraDevice device) {
+                    if (requestGeneration != cameraGeneration || !active) { device.close(); return; }
+                    opening = false;
                     camera = device;
                     createPreview();
                 }
                 @Override public void onDisconnected(CameraDevice device) {
-                    device.close(); camera = null;
+                    if (requestGeneration == cameraGeneration) opening = false;
+                    device.close();
+                    if (camera == device) camera = null;
+                    showError("相機已中斷連線");
                 }
                 @Override public void onError(CameraDevice device, int error) {
-                    device.close(); camera = null;
-                    runOnUiThread(() -> hint.setText("無法開啟相機，錯誤碼：" + error));
+                    if (requestGeneration == cameraGeneration) opening = false;
+                    device.close();
+                    if (camera == device) camera = null;
+                    showError("無法開啟相機，錯誤碼：" + error);
                 }
             }, handler);
         } catch (Exception ex) {
-            hint.setText("開啟相機失敗：" + ex.getMessage());
+            opening = false;
+            showError("開啟相機失敗：" + ex.getMessage());
             Store.event(this, "camera_error", ex.getMessage());
         }
     }
@@ -152,21 +214,24 @@ public class CameraActivity extends Activity {
         try {
             SurfaceTexture texture = textureView.getSurfaceTexture();
             if (texture == null || camera == null || reader == null) return;
-            texture.setDefaultBufferSize(1280, 720);
-            Surface surface = new Surface(texture);
-            camera.createCaptureSession(Arrays.asList(surface, reader.getSurface()),
+            if (!active) return;
+            texture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+            previewSurface = new Surface(texture);
+            camera.createCaptureSession(Arrays.asList(previewSurface, reader.getSurface()),
                     new CameraCaptureSession.StateCallback() {
                         @Override public void onConfigured(CameraCaptureSession s) {
+                            if (!active || camera == null) { s.close(); return; }
                             session = s;
                             try {
                                 CaptureRequest.Builder b = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                                b.addTarget(surface);
+                                b.addTarget(previewSurface);
                                 b.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                                 session.setRepeatingRequest(b.build(), null, handler);
+                                runOnUiThread(() -> { if (active) captureButton.setEnabled(true); });
                             } catch (Exception ex) { Store.event(CameraActivity.this, "preview_error", ex.getMessage()); }
                         }
                         @Override public void onConfigureFailed(CameraCaptureSession s) {
-                            runOnUiThread(() -> hint.setText("相機預覽初始化失敗"));
+                            showError("相機預覽初始化失敗");
                         }
                     }, handler);
         } catch (Exception ex) { Store.event(this, "preview_error", ex.getMessage()); }
@@ -176,15 +241,26 @@ public class CameraActivity extends Activity {
             Toast.makeText(this, "相機尚未就緒", Toast.LENGTH_SHORT).show(); return;
         }
         try {
+            captureButton.setEnabled(false);
             CaptureRequest.Builder builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             builder.addTarget(reader.getSurface());
+            builder.set(CaptureRequest.JPEG_ORIENTATION, jpegOrientation);
             builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             session.capture(builder.build(), null, handler);
-        } catch (Exception ex) { Store.event(this, "photo_error", ex.getMessage()); }
+        } catch (Exception ex) {
+            captureButton.setEnabled(true);
+            Store.event(this, "photo_error", ex.getMessage());
+            showError("拍照失敗：" + ex.getMessage());
+        }
+    }
+    private void showError(String message) {
+        runOnUiThread(() -> { if (active) hint.setText(message); });
     }
     private void closeCamera() {
+        captureButton.setEnabled(false);
         if (session != null) { session.close(); session = null; }
         if (camera != null) { camera.close(); camera = null; }
         if (reader != null) { reader.close(); reader = null; }
+        if (previewSurface != null) { previewSurface.release(); previewSurface = null; }
     }
 }

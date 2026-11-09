@@ -33,3 +33,11 @@ Android 8.0 (API 26) 至目標 Android 15 (API 35)。首次按各功能時依照
 CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若沒有圖片或工作流程失敗，不能宣稱操作截圖已完成。
 
 [GitHub Actions](https://github.com/hub-google/Record2/actions)
+
+## 檔案管理（2026-11-09 更新）
+
+首頁新增「管理錄音與照片」：列出最近 40 筆錄音或照片；錄音可播放／停止播放，照片可預覽，兩種檔案均可透過 Android 的**儲存檔案**選擇器匯出並可確認後刪除。
+
+檔案匯出使用 Android Storage Access Framework 的 `ACTION_CREATE_DOCUMENT`，**不需要全裝置儲存權限**。未選擇匯出時，不會自行上傳或分享。App 不要求網路權限。照片使用縮圖解碼以降低記憶體佔用；音訊播放器在離開頁面後停止。
+
+測試範圍擴充為檔案清單、音訊格式／照片驗證、照片預覽，以及 Android 系統明確拒絕麥克風與相機授權後不會自行啟動的測試。詳見 `docs/TEST_PLAN.md`。實際 PASS/FAIL 以 GitHub Actions 內容為準。

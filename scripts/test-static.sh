@@ -21,12 +21,15 @@ assert len(services)==2
 assert {x.attrib[ns+'foregroundServiceType'] for x in services}=={'microphone','location'}
 assert all(x.attrib[ns+'exported']=='false' for x in services)
 java=root/'java/com/hubgoogle/record2'
-for name in ['MainActivity','CameraActivity','AudioRecordService','LocationTrackService','Store','Notifications']:
+for name in ['MainActivity','CameraActivity','AudioRecordService','LocationTrackService','Store','Notifications','MediaLibraryActivity']:
     assert (java/(name+'.java')).exists(),name
 assert 'createCaptureSession' in (java/'CameraActivity.java').read_text()
 assert 'MediaRecorder' in (java/'AudioRecordService.java').read_text()
 assert 'requestLocationUpdates' in (java/'LocationTrackService.java').read_text()
 assert 'Intent.ACTION_SEND' in (java/'MainActivity.java').read_text()
+assert 'Intent.ACTION_CREATE_DOCUMENT' in (java/'MediaLibraryActivity.java').read_text()
+assert 'MediaPlayer' in (java/'MediaLibraryActivity.java').read_text()
+assert 'BitmapFactory.decodeFile' in (java/'MediaLibraryActivity.java').read_text()
 assert 'startForeground(' in (java/'AudioRecordService.java').read_text()
 assert 'startForeground(' in (java/'LocationTrackService.java').read_text()
 assert 'android.intent.category.LAUNCHER' in (root/'AndroidManifest.xml').read_text()

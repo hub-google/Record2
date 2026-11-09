@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -18,7 +19,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
-import java.util.ArrayList;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_AUDIO = 201;
@@ -101,6 +101,10 @@ public class MainActivity extends Activity {
         storageStatus = text("", 14, Color.DKGRAY, false);
         main.addView(storageStatus);
         main.addView(gap(12));
+        Button fileButton = button("管理錄音與照片", teal);
+        fileButton.setOnClickListener(v -> startActivity(new Intent(this, MediaLibraryActivity.class)));
+        main.addView(fileButton);
+        main.addView(gap(12));
         Button shareButton = button("分享紀錄摘要", navy);
         shareButton.setOnClickListener(v -> {
             Intent send = new Intent(Intent.ACTION_SEND);
@@ -149,6 +153,12 @@ public class MainActivity extends Activity {
                 checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
+            return;
+        }
+        LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (lm == null || (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) &&
+                !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER))) {
+            toast("請先到 Android 設定中開啟手機定位服務");
             return;
         }
         Intent start = new Intent(this, LocationTrackService.class).setAction(LocationTrackService.START);

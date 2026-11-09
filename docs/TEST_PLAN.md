@@ -1,63 +1,67 @@
-# Record2 — 測試計畫與實際執行報告
+# Record2 測試計畫與執行紀錄
 
-**測試日期**：2026-11-06  
-**程式版本**：`0bc52f98e3e8a754659ebbe84d1ded48cc37beb0`（當次測試原始碼）  
-**測試裝置**：GitHub Actions Ubuntu + Android Emulator API 35 / Google APIs / x86_64 / Pixel 6  
-**CI 執行結果**：**SUCCESS** — [Actions Run 42162974699](https://github.com/hub-google/Record2/actions/runs/42162974699)  
-**測試方式**：Gradle Debug APK 編譯、`bash scripts/test-static.sh`、ADB 操作、UIAutomator 尋找按鈕、GPS emulator geo fix、畫面截圖及檔案數量斷言。
+## 環境與範圍
 
-## 實測結論
+- Android：API 26–35 支援性目標；CI 使用 API 35 模擬器。跨品牌相容性待實機覆核。
+- 資料：只儲存在本機，沒有後端、帳號、伺服器同步功能。
+- 重要：不測試也不提供無提示啟用攝錄、隱形安裝、規避系統指示器的能力。
 
-- **PASS**：程式碼靜態檢查；Gradle `assembleDebug`；APK 成功安裝並啟動；錄音啟動與停止；定位啟動與停止；模擬 GPS 座標成功顯示；相機預覽與拍照；返回首頁；本機資料顯示 **錄音檔 1、照片 1**；六張實際模擬器截圖均產出。
-- **未測／待補**：手動拒絕權限、離開 App 後長時間持續執行、真實 GPS 移動、音訊檔完整回放及音質量測、相機 JPEG 解碼／EXIF、分享選單、App 強制關閉與重啟、不同 Android API／廠牌、無鏡頭手機、真機長時間可靠性、耗電測試。
-- **紀錄**：`docs/test-evidence/error-log.txt` 在本次操作結束時為空；只能表示所擷取的 `Record2:E`、`AndroidRuntime:E` 過濾項目沒有紀錄，不代表全面沒有錯誤。
-- **注意**：並未提供隱藏啟動、規避系統通知或不經授權啟動感測器等功能；這些也不在測試範圍。
-
-## 逐項測試案例
-
-| ID | 操作／預期 | 結果 | 觀察與佐證 |
+| ID | 操作步驟 | 預期結果 | 實際狀態 |
 |---|---|---|---|
-| T01 | 安裝、啟動 App，首頁顯示錄音、定位、相機與分享 | **PASS** | [01-home.png](test-evidence/01-home.png)，且 UIAutomator 驗證「開始錄音」可見 |
-| T02 | 首次錄音時請求使用者權限，拒絕時不得錄音 | **未測** | CI 使用 `adb pm grant` 預先授權，未經權限對話框 |
-| T03 | 開始錄音，前景服務與可見狀態正常 | **部分通過** | [02-recording.png](test-evidence/02-recording.png)；畫面顯示「錄音進行中」及系統麥克風使用指示，但未驗證切換 App 後的長時間持續性 |
-| T04 | 停止錄音後產生錄音檔 | **PASS（數量）** | [06-saved-files.png](test-evidence/06-saved-files.png) 顯示「錄音檔：1」；尚未對 M4A 進行回放／頻譜檢查 |
-| T05 | 啟動持續定位並呈現服務狀態 | **PASS** | [03-location.png](test-evidence/03-location.png)，顯示「持續定位中」 |
-| T06 | 注入座標並刷新顯示，事件紀錄更新 | **部分通過** | `adb emu geo fix 121.5654 25.0330`；畫面顯示 `25.033000, 121.565398 (±5m)`；尚未直接解析 JSONL 內容 |
-| T07 | 停止定位，按鈕恢復初始狀態 | **PASS（介面）** | [06-saved-files.png](test-evidence/06-saved-files.png) 顯示「未定位」；未做長時間停止後無更新驗證 |
-| T08 | 相機預覽可開啟，拍照可保存 | **PASS（數量）** | [04-camera.png](test-evidence/04-camera.png)、[05-photo.png](test-evidence/05-photo.png)，返回首頁後照片數 1；未做 JPEG 解碼／畫質驗證 |
-| T09 | 關閉相機返回首頁 | **PASS** | [06-saved-files.png](test-evidence/06-saved-files.png) |
-| T10 | 拒絕麥克風、位置、相機權限 | **未測** | 待手動與 UI 自動化拒絕流程 |
-| T11 | 分享紀錄摘要 | **未測** | 待驗證 Android 分享面板及傳出內容 |
-| T12 | 背景、低電量、省電與定位服務關閉情境 | **未測** | 待實機測試 |
-| T13 | Android 8、11、12、13、14、15 與廠牌交叉相容 | **部分通過** | 僅 CI Android 15 / API 35；其他未測 |
-| T14 | 無相機硬體或相機權限撤銷 | **未測** | 待相容性測試 |
+| T01 | 啟動 App | 首頁看到錄音／定位／相機／分享 | 靜態檢查通過；模擬器待驗證 |
+| T02 | 首次按錄音並授權 | 顯示 Android 權限要求 | 程式路徑已檢查；模擬器待驗證 |
+| T03 | 開始錄音／返回首頁 | 前景服務通知持續顯示 | 程式路徑已檢查；模擬器待驗證 |
+| T04 | 停止錄音 | 儲存 M4A 檔，數量增加 | 程式路徑已檢查；模擬器待驗證 |
+| T05 | 開始定位 | 顯示系統通知，等待位置 | 程式路徑已檢查；模擬器待驗證 |
+| T06 | 透過 emulator geo fix 注入位置 | 最近位置更新，JSONL 多一筆 | 模擬器待驗證 |
+| T07 | 停止定位 | 位置服務停止，不再接收更新 | 程式路徑已檢查；模擬器待驗證 |
+| T08 | 開相機、拍照 | 可見預覽，儲存 JPEG | 程式路徑已檢查；模擬器待驗證 |
+| T09 | 返回首頁 | 相機硬體與資源釋放 | 程式路徑已檢查；模擬器待驗證 |
+| T10 | 不授權麥克風／位置／相機 | 功能無法擅自啟動，顯示說明 | 程式路徑已檢查；模擬器待驗證 |
+| T11 | 分享紀錄摘要 | 系統分享選單顯示文字 | 程式路徑已檢查；模擬器待驗證 |
+| T12 | 實機關閉位置服務／切換 App／耗電優化 | 能合理處理定位缺席與系統限制 | 待不同廠牌實機測試 |
+| T13 | 安裝在 Android 8、11、12、13、14、15 | 權限／感測器差異合理處理 | 只有 API 35 排入 CI，其他待驗證 |
+| T14 | 相機缺席裝置 | 明確告知無相機，不崩潰 | 程式路徑已檢查；模擬器待驗證 |
 
-## 操作截圖
+## 靜態測試
 
-以下 PNG 全部由此次 GitHub Actions 中的 Android 35 模擬器擷取，**非示意圖**：
+執行 `bash scripts/test-static.sh`：**PASS**（2026-11-06，本機原始碼靜態檢查）。確認 Manifest 能解析、必要權限、服務不可外部啟動、離線儲存／通知／相機處理程式路徑存在。這不是 APK 編譯測試，也不是裝置操作測試。
 
-1. [01-home.png — 首頁](test-evidence/01-home.png)
-2. [02-recording.png — 錄音執行中](test-evidence/02-recording.png)
-3. [03-location.png — 持續定位及注入座標](test-evidence/03-location.png)
-4. [04-camera.png — 相機預覽](test-evidence/04-camera.png)
-5. [05-photo.png — 點擊拍照後](test-evidence/05-photo.png)
-6. [06-saved-files.png — 錄音檔 1、照片 1](test-evidence/06-saved-files.png)
+## 操作截圖（由 GitHub Actions 模擬器產生）
 
-[完整 CI 執行紀錄](https://github.com/hub-google/Record2/actions/runs/42162974699)；從該頁 **Artifacts** 下載 `Record2-debug-APK` 與 `Record2-test-evidence`。
+當 CI 成功，截圖將存於：
 
-## 風險與已知限制
+- `docs/test-evidence/01-home.png`：首頁
+- `docs/test-evidence/02-recording.png`：錄音啟動後
+- `docs/test-evidence/03-location.png`：定位啟動後
+- `docs/test-evidence/04-camera.png`：相機預覽
+- `docs/test-evidence/05-photo.png`：拍照後
 
-- API 35 模擬器的 PASS 不等於所有 Android 版本、廠牌、機型皆可用；本次未完成真機相容性驗證。
-- 資料預設存於 App 專屬的手機本機目錄；不是雲端資料庫，也沒有遠端指揮、同步或登入。
-- 錄音與定位需要使用者先行授權；會顯示前景服務通知或 Android 的麥克風／相機／定位系統提示。
-- 音質依裝置及環境而異；未做無損錄音／音質量測承諾。
-- 首輪 CI 的 SDK 安裝失敗及首次模擬器截圖不完整，已在後續版本修正。以 **42162974699** 為此次正式驗證依據。
+**目前不將示意圖充當實際操作截圖。** 正式 PASS/FAIL 及截圖須以 CI 成功執行後的 GitHub Actions 紀錄為準。
 
-## 重測指令
+## 已知限制
 
-```bash
-bash scripts/test-static.sh
-gradle --no-daemon :app:assembleDebug
-# 在已啟動的 Android 模擬器上：
-bash scripts/emulator-smoke.sh
-```
+- 音質因手機麥克風、環境與 Android 音訊策略而異，不保證無損。
+- Android 12+ 顯示相機／麥克風使用指示；通知為預期的可見行為。
+- 不申請 ACCESS_BACKGROUND_LOCATION；定位前景服務必須由使用者從畫面啟動。
+- 使用 Android 原生 Camera2，不同裝置圖像旋轉與尺寸仍需實機檢查。
+- 這是最小可運作版本，不包含遠端控制、後端同步、登入與加密資料庫。
+
+## 2026-11-09 回歸測試擴充
+
+上次測試記錄不足以證明音檔可回放、JPEG 能解碼、拒絕權限時不會啟動感測器，因此此次補上以下**需要實際執行的測試**（未執行前不能列為 PASS）：
+
+| ID | 測試 | 驗證方式 |
+| --- | --- | --- |
+| R01 | 本機錄音檔可瀏覽 | 首頁開啟檔案管理，清單出現 `錄音：1` |
+| R02 | 錄音可播放 | 點「播放」，MediaPlayer 能準備並開始播放；需確認 UI 與錯誤日誌 |
+| R03 | 照片可預覽 | 切到照片清單、點「檢視」，以 BitmapFactory 解碼圖片並出現視窗 |
+| R04 | M4A 實際有資料 | ADB 抽取錄音，驗證 ftyp/moov/mdat；有 ffprobe 時驗證 AAC |
+| R05 | JPEG 有資料且可解碼 | ADB 抽取圖片，驗證 JPEG 標頭／結尾與 R03 |
+| R06 | 無麥克風權限時不會錄音 | `pm revoke` 後按開始錄音，點「Don't allow」，確認服務不啟動 |
+| R07 | 無相機權限時不會開鏡頭 | `pm revoke` 後按開鏡頭，點「Don't allow」，確認仍留首頁 |
+| R08 | 匯出檔案 | 手動選擇位置、儲存、由檔案管理員驗證內容；需實機覆核 |
+| R09 | 刪除檔案 | 點刪除後取消／確認，數量與實體檔案一致；需實機覆核 |
+| R10 | 切換前背景／相機旋轉／多次重開 | 相機資源釋放且不當機；需實機覆核 |
+
+自動化新增 `scripts/emulator-permissions.sh`，其輸出與螢幕截圖會保留到 `docs/test-evidence/`。**此區段是測試設計，不是通過證明。**
