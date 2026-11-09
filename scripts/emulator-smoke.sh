@@ -99,6 +99,19 @@ sleep 3
 adb exec-out screencap -p > docs/test-evidence/05-photo.png
 click_text '關閉相機'
 sleep 3
+# The remote-request section added above the media library makes the existing
+# file summary fall below the first screen. Scroll to it instead of treating a
+# not-yet-visible TextView as a missing recording or photo.
+for attempt in $(seq 1 5); do
+  adb shell uiautomator dump /sdcard/window.xml >/dev/null
+  if adb shell cat /sdcard/window.xml | grep -q '錄音檔：1'; then
+    if adb shell cat /sdcard/window.xml | grep -q '照片：1'; then
+      break
+    fi
+  fi
+  adb shell input swipe 500 1600 500 570 350
+  sleep 1
+done
 adb exec-out screencap -p > docs/test-evidence/06-saved-files.png
 adb shell uiautomator dump /sdcard/window.xml >/dev/null
 adb pull /sdcard/window.xml /tmp/record2-after.xml >/dev/null
