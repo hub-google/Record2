@@ -1,13 +1,13 @@
 ACTIVITY MANAGER SERVICES (dumpsys activity services)
   User 0 active services:
-  * ServiceRecord{eb01442 u0 com.hubgoogle.record2/.AudioRecordService c:com.hubgoogle.record2}
+  * ServiceRecord{96296c7 u0 com.hubgoogle.record2/.AudioRecordService c:com.hubgoogle.record2}
     intent={act=com.hubgoogle.record2.audio.START cmp=com.hubgoogle.record2/.AudioRecordService}
     packageName=com.hubgoogle.record2
     processName=com.hubgoogle.record2
     targetSdkVersion=35
-    baseDir=/data/app/~~VaiS9dKzM2iBkASpg7-GUw==/com.hubgoogle.record2-zfodgwuqWrED_yey5cpdrw==/base.apk
+    baseDir=/data/app/~~YN8oQaD6CdF9a8z0gEU6ng==/com.hubgoogle.record2-N4cl_lg60UcPA-ck7uBK3A==/base.apk
     dataDir=/data/user/0/com.hubgoogle.record2
-    app=ProcessRecord{6d6e4ac 5695:com.hubgoogle.record2/u0a209}
+    app=ProcessRecord{7ee0975 5828:com.hubgoogle.record2/u0a209}
     useNewWiuLogic_forCapabilities()=true
     useNewWiuLogic_forStart()=true
     useNewBfslLogic()=true
@@ -30,7 +30,7 @@ ACTIVITY MANAGER SERVICES (dumpsys activity services)
     startForegroundCount=1
     infoAllowStartForeground=[callingPackage: com.hubgoogle.record2; callingUid: 10209; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { act=com.hubgoogle.record2.audio.START cmp=com.hubgoogle.record2/.AudioRecordService }; code:PROC_STATE_TOP; tempAllowListReason:<null>; targetSdkVersion:35; callerTargetSdkVersion:35; startForegroundCount:0; bindFromPackage:null: isBindService:false]
     isForeground=true foregroundId=101 types=0x00000080 foregroundNoti=Notification(channel=record2_active shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE color=0x00000000 vis=PRIVATE)
-    createTime=-14s42ms startingBgTimeout=--
-    lastActivity=-14s33ms restartTime=-14s33ms createdFromFg=true
+    createTime=-14s14ms startingBgTimeout=--
+    lastActivity=-14s14ms restartTime=-14s14ms createdFromFg=true
     startRequested=true delayedStop=false stopIfKilled=true callStart=true lastStartId=1
  startCommandResult=2
