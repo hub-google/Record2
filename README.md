@@ -94,3 +94,7 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 檔案匯出使用 Android Storage Access Framework 的 `ACTION_CREATE_DOCUMENT`，**不需要全裝置儲存權限**。未選擇匯出時，不會自行上傳或分享。App 不要求網路權限。照片使用縮圖解碼以降低記憶體佔用；音訊播放器在離開頁面後停止。
 
 測試範圍擴充為檔案清單、音訊格式／照片驗證、照片預覽，以及 Android 系統明確拒絕麥克風與相機授權後不會自行啟動的測試。詳見 `docs/TEST_PLAN.md`。實際 PASS/FAIL 以 GitHub Actions 內容為準。
+
+## GitHub 開源方案調查（2026-11-09）
+
+已檢查 AndroidMCP、OwnTracks、Haven 及 RustDesk 的遠端控制、背景定位及感測器功能。詳細比較、原始碼授權、Android 官方限制與可參考的授權式實作方向，請見 **[docs/OPEN_SOURCE_ASSESSMENT.md](docs/OPEN_SOURCE_ASSESSMENT.md)**。此文件是技術研究，不代表已整合；原始隱形／無提示條件仍屬未達成。
