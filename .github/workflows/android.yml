@@ -47,6 +47,7 @@ jobs:
           emulator-options: -no-window -no-audio -no-snapshot -camera-back emulated -camera-front emulated -gpu swiftshader_indirect
           script: |
             bash scripts/emulator-smoke.sh
+            bash scripts/emulator-library.sh
             bash scripts/emulator-permissions.sh
       - uses: actions/upload-artifact@v4
         if: always()
