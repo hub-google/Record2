@@ -19,6 +19,24 @@ adb shell am start -W -n "$APP/.MainActivity" || true
 home_ready=false
 for attempt in $(seq 1 45); do
   adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
+  # Google APIs emulator may raise an unrelated first-boot googleSDKSetup ANR
+  # that obscures an otherwise healthy Record2 home screen.
+  if adb shell cat /sdcard/window.xml 2>/dev/null | grep -q 'com.google.android.googlesdksetup'; then
+    echo 'Detected Google emulator setup ANR dialog; closing unrelated system process'
+    adb pull /sdcard/window.xml /tmp/record2-anr-window.xml >/dev/null 2>&1 || true
+    python3 - <<'PY'
+import re, subprocess, xml.etree.ElementTree as ET
+try:
+    for n in ET.parse('/tmp/record2-anr-window.xml').getroot().iter('node'):
+        if n.attrib.get('text') == 'Close app':
+            x1,y1,x2,y2 = map(int,re.findall(r'\d+',n.attrib['bounds']))
+            subprocess.check_call(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)])
+            break
+except (OSError, ValueError, ET.ParseError) as ex:
+    print('Unable to dismiss system setup ANR:',ex)
+PY
+    sleep 2
+  fi
   if adb shell cat /sdcard/window.xml 2>/dev/null | grep -q '開始錄音'; then
     home_ready=true
     break
