@@ -51,8 +51,8 @@ PY
 click_text '開始定位'
 sleep 2
 adb shell input keyevent KEYCODE_HOME
-adb emu geo fix 121.5654 25.0330 || true
-sleep 12
+adb emu geo fix 121.6000 25.0500 || true
+sleep 35
 adb shell dumpsys activity services "$APP" > "$EVIDENCE/16-background-location-service.txt"
 if ! grep -q LocationTrackService "$EVIDENCE/16-background-location-service.txt"; then
   echo 'FAIL: location service stopped when leaving app'
@@ -68,6 +68,6 @@ python3 - <<'PY'
 import json
 with open('/tmp/record2-background-events.jsonl') as f:
     events=[json.loads(x) for x in f if x.strip()]
-assert any(e.get('type')=='location_point' for e in events), 'No recorded location points'
+assert any(e.get('type')=='location_point' and '25.050000, 121.600' in e.get('detail','') for e in events), 'No background GPS point at injected coordinate'
 print('PASS: visible, authorized location foreground service survived Home and logged position')
 PY
