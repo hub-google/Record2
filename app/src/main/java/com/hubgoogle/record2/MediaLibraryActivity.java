@@ -14,6 +14,9 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.FrameLayout;
+import android.widget.MediaController;
+import android.widget.VideoView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -36,7 +39,8 @@ public class MediaLibraryActivity extends Activity {
         super.onCreate(state);
         if (state != null) {
             String savedCategory = state.getString("selectedCategory");
-            if ("audio".equals(savedCategory) || "photos".equals(savedCategory)) category = savedCategory;
+            if ("audio".equals(savedCategory) || "photos".equals(savedCategory) ||
+                    "videos".equals(savedCategory)) category = savedCategory;
             String savedExportName = state.getString("pendingExportName");
             if (savedExportName != null) {
                 // Match only our own media files; never restore an arbitrary file path.
@@ -55,17 +59,20 @@ public class MediaLibraryActivity extends Activity {
 
         TextView title = label("我的檔案", 26);
         content.addView(title);
-        TextView description = label("錄音與照片僅保存在手機。匯出會讓你自行選擇儲存位置。", 14);
+        TextView description = label("錄音、照片與影片僅保存在手機。匯出會讓你自行選擇儲存位置。", 14);
         description.setPadding(0, dp(8), 0, dp(12));
         content.addView(description);
 
         LinearLayout tabs = new LinearLayout(this);
         Button audios = button("錄音清單");
         Button photos = button("照片清單");
+        Button videos = button("影片清單");
         audios.setOnClickListener(v -> { stopPlayback(); category = "audio"; refresh(); });
         photos.setOnClickListener(v -> { stopPlayback(); category = "photos"; refresh(); });
         tabs.addView(audios, new LinearLayout.LayoutParams(0, dp(52), 1f));
         tabs.addView(photos, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        videos.setOnClickListener(v -> { stopPlayback(); category = "videos"; refresh(); });
+        tabs.addView(videos, new LinearLayout.LayoutParams(0, dp(52), 1f));
         content.addView(tabs);
 
         list = new LinearLayout(this);
@@ -82,7 +89,7 @@ public class MediaLibraryActivity extends Activity {
         list.removeAllViews();
         try {
             File[] files = Store.mediaFiles(this, category);
-            TextView heading = label(("audio".equals(category) ? "錄音" : "照片") + "：" + files.length + " 個", 18);
+            TextView heading = label(("audio".equals(category) ? "錄音" : "photos".equals(category) ? "照片" : "影片") + "：" + files.length + " 個", 18);
             heading.setPadding(0, dp(20), 0, dp(8));
             list.addView(heading);
             if (files.length == 0) {
@@ -104,8 +111,13 @@ public class MediaLibraryActivity extends Activity {
         TextView text = label(file.getName() + "  (" + (file.length() / 1024) + " KB)", 13);
         row.addView(text);
         LinearLayout actions = new LinearLayout(this);
-        Button view = button("audio".equals(category) ? "播放" : "檢視");
-        view.setOnClickListener(v -> { if ("audio".equals(category)) togglePlayback(file); else previewImage(file); });
+        Button view = button("audio".equals(category) ? "播放" :
+                "videos".equals(category) ? "播放影片" : "檢視");
+        view.setOnClickListener(v -> {
+            if ("audio".equals(category)) togglePlayback(file);
+            else if ("videos".equals(category)) previewVideo(file);
+            else previewImage(file);
+        });
         actions.addView(view, new LinearLayout.LayoutParams(0, dp(48), 1f));
         Button export = button("匯出");
         export.setOnClickListener(v -> exportFile(file));
@@ -176,12 +188,37 @@ public class MediaLibraryActivity extends Activity {
         } catch (Exception ex) { toast("無法檢視圖片：" + ex.getMessage()); }
     }
 
+    private void previewVideo(File file) {
+        if (!file.isFile()) { toast("影片檔案不存在"); refresh(); return; }
+        FrameLayout container = new FrameLayout(this);
+        VideoView video = new VideoView(this);
+        container.addView(video, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(260)));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(file.getName())
+                .setView(container).setPositiveButton("關閉", null)
+                .setOnDismissListener(d -> video.stopPlayback()).create();
+        try {
+            dialog.show();
+            video.setMediaController(new MediaController(this));
+            video.setVideoPath(file.getAbsolutePath());
+            video.setOnPreparedListener(mp -> video.start());
+            video.setOnErrorListener((mp, what, extra) -> {
+                toast("影片無法播放");
+                return true;
+            });
+        } catch (Exception ex) {
+            dialog.dismiss();
+            toast("無法開啟影片：" + ex.getMessage());
+        }
+    }
+
     private void exportFile(File file) {
         if (!file.isFile()) { toast("檔案不存在"); refresh(); return; }
         pendingExport = file;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType(file.getName().endsWith(".jpg") ? "image/jpeg" : "audio/mp4");
+        intent.setType(file.getName().endsWith(".jpg") ? "image/jpeg" :
+                file.getName().endsWith(".mp4") ? "video/mp4" : "audio/mp4");
         intent.putExtra(Intent.EXTRA_TITLE, file.getName());
         try { startActivityForResult(intent, EXPORT_DOCUMENT); }
         catch (Exception ex) { pendingExport = null; toast("無法開啟檔案選擇器：" + ex.getMessage()); }

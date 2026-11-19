@@ -28,8 +28,12 @@ public class MainActivity extends Activity {
     private static final int REQUEST_LOCATION = 202;
     private static final int REQUEST_CAMERA = 203;
     private static final int REQUEST_REMOTE_NOTIFICATIONS = 205;
+    private static final int REQUEST_VIDEO_CAMERA = 206;
+    private static final int REQUEST_VIDEO_NOTIFICATIONS = 207;
     private TextView audioStatus;
     private TextView locationStatus;
+    private TextView videoStatus;
+    private Button videoButton;
     private TextView storageStatus;
     private Button audioButton;
     private Button locationButton;
@@ -71,7 +75,7 @@ public class MainActivity extends Activity {
         main.addView(text("我的裝置 · 私有感測紀錄", 14, Color.DKGRAY, false));
         main.addView(gap(18));
 
-        TextView note = text("資料預設只保存在這支手機。錄音和定位執行時會顯示 Android 前景服務通知。", 14, navy, false);
+        TextView note = text("資料預設只保存在這支手機。錄音、定位與背景錄影期間都會顯示 Android 感測器指示及通知。", 14, navy, false);
         note.setBackgroundColor(Color.rgb(226, 243, 242));
         note.setPadding(dp(16), dp(14), dp(16), dp(14));
         main.addView(note);
@@ -103,6 +107,16 @@ public class MainActivity extends Activity {
         main.addView(cameraButton);
         main.addView(gap(20));
 
+        main.addView(text("背景錄影（無聲）", 20, navy, true));
+        main.addView(text("啟動後可切換 App 或關閉螢幕繼續錄影。有明確通知及停止按鈕；影片不錄聲音。", 13, Color.DKGRAY, false));
+        videoStatus = text("尚未錄影", 14, Color.GRAY, false);
+        main.addView(videoStatus);
+        main.addView(gap(8));
+        videoButton = button("開始背景錄影", teal);
+        videoButton.setOnClickListener(v -> toggleVideo());
+        main.addView(videoButton);
+        main.addView(gap(20));
+
         main.addView(text("遠端請求（需要手機同意）", 20, navy, true));
         main.addView(text("預設關閉、只監聽手機本機位址，經 ADB 轉送連線；每次錄音、定位或相機請求都必須在手機確認。沒有自動傳輸音檔、照片或位置資訊。", 13, Color.DKGRAY, false));
         main.addView(gap(8));
@@ -126,7 +140,7 @@ public class MainActivity extends Activity {
         storageStatus = text("", 14, Color.DKGRAY, false);
         main.addView(storageStatus);
         main.addView(gap(12));
-        Button fileButton = button("管理錄音與照片", teal);
+        Button fileButton = button("管理錄音、照片與影片", teal);
         fileButton.setOnClickListener(v -> startActivity(new Intent(this, MediaLibraryActivity.class)));
         main.addView(fileButton);
         main.addView(gap(12));
@@ -139,7 +153,7 @@ public class MainActivity extends Activity {
         });
         main.addView(shareButton);
         main.addView(gap(10));
-        main.addView(text("完整音檔、照片與 events.jsonl 位於 App 專屬儲存空間；卸載 App 會清除專屬檔案。", 12, Color.GRAY, false));
+        main.addView(text("音檔、照片、影片與 events.jsonl 位於 App 專屬儲存空間；卸載 App 會清除專屬檔案。", 12, Color.GRAY, false));
         main.addView(gap(14));
         Button docsButton = button("查看資料路徑", navy);
         docsButton.setOnClickListener(v -> {
@@ -148,6 +162,46 @@ public class MainActivity extends Activity {
         });
         main.addView(docsButton);
         refresh();
+    }
+
+    private void toggleVideo() {
+        if (VideoRecordService.stopping) {
+            toast("正在完成上一段錄影，請稍後再開始");
+            return;
+        }
+        if (VideoRecordService.running || VideoRecordService.starting) {
+            stopService(new Intent(this, VideoRecordService.class));
+            toast("正在結束並儲存影片");
+            videoButton.postDelayed(this::refresh, 600);
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_VIDEO_CAMERA);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_VIDEO_NOTIFICATIONS);
+            return;
+        }
+        if (!VideoRecordService.notificationsAllowed(this)) {
+            toast("需要可見通知，請先在 Android 設定開啟 Record2 通知");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("開始背景錄影？")
+                .setMessage("相機將持續錄影（無聲），即使切換 App 或關閉螢幕。Android 將顯示感測器指示和錄影通知，可從通知欄停止。請確認已取得拍攝場所及相關人員同意。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("開始錄影", (d, which) -> {
+                    try {
+                        startForegroundService(new Intent(this, VideoRecordService.class)
+                                .setAction(VideoRecordService.START));
+                        toast("正在啟動錄影，請確認通知已出現");
+                    } catch (Exception ex) {
+                        toast("無法開始錄影：" + ex.getMessage());
+                    }
+                    videoButton.postDelayed(this::refresh, 900);
+                }).show();
     }
 
     private void toggleRemote() {
@@ -325,6 +379,10 @@ public class MainActivity extends Activity {
     }
 
     private void openCamera() {
+        if (VideoRecordService.running || VideoRecordService.starting || VideoRecordService.stopping) {
+            toast("背景錄影運作中，請先停止錄影再開啟相機");
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
             return;
@@ -339,6 +397,8 @@ public class MainActivity extends Activity {
         else if (code == REQUEST_LOCATION && (granted ||
                 checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) toggleLocation();
         else if (code == REQUEST_CAMERA && granted) openCamera();
+        else if (code == REQUEST_VIDEO_CAMERA && granted) toggleVideo();
+        else if (code == REQUEST_VIDEO_NOTIFICATIONS && granted) toggleVideo();
         else if (code == REQUEST_REMOTE_NOTIFICATIONS && granted) toggleRemote();
         else if (code != 204) toast("需要授權才能使用此功能");
         refresh();
@@ -362,6 +422,16 @@ public class MainActivity extends Activity {
     }
 
     private void refresh() {
+        if (videoButton != null) {
+            videoButton.setEnabled(!VideoRecordService.stopping);
+            videoButton.setText(VideoRecordService.running || VideoRecordService.starting ?
+                    "停止背景錄影" : VideoRecordService.stopping ? "正在儲存影片…" : "開始背景錄影");
+            videoStatus.setText(VideoRecordService.running ? "● 正在錄影（有通知）" :
+                    VideoRecordService.starting ? "● 正在啟動相機…" :
+                    VideoRecordService.stopping ? "● 正在完成 MP4…" :
+                    VideoRecordService.lastError.isEmpty() ? "○ 未錄影" :
+                    "○ 上次錄影錯誤：" + VideoRecordService.lastError);
+        }
         audioStatus.setText(AudioRecordService.running ? "● 錄音進行中（有系統通知）" : "○ 未錄音");
         locationStatus.setText(LocationTrackService.running ? "● 持續定位中（有系統通知）" : "○ 未定位");
         audioButton.setText(AudioRecordService.running ? "停止錄音" : "開始錄音");

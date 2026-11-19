@@ -15,7 +15,8 @@ public final class Store {
     private Store() {}
 
     public static File directory(Context context, String kind) {
-        if (!"audio".equals(kind) && !"photos".equals(kind) && !"events".equals(kind)) {
+        if (!"audio".equals(kind) && !"photos".equals(kind) &&
+                !"videos".equals(kind) && !"events".equals(kind)) {
             throw new IllegalArgumentException("Unknown storage category");
         }
         File root = context.getExternalFilesDir(null);
@@ -27,7 +28,8 @@ public final class Store {
 
     public static File newFile(Context context, String kind, String extension) {
         if (!("audio".equals(kind) && ".m4a".equals(extension)) &&
-                !("photos".equals(kind) && ".jpg".equals(extension))) {
+                !("photos".equals(kind) && ".jpg".equals(extension)) &&
+                !("videos".equals(kind) && ".mp4".equals(extension))) {
             throw new IllegalArgumentException("Unsupported recording file type");
         }
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(new Date());
@@ -35,9 +37,10 @@ public final class Store {
     }
 
     public static File[] mediaFiles(Context context, String kind) {
-        if (!"audio".equals(kind) && !"photos".equals(kind)) throw new IllegalArgumentException("Unknown media category");
+        if (!"audio".equals(kind) && !"photos".equals(kind) && !"videos".equals(kind)) throw new IllegalArgumentException("Unknown media category");
         File[] files = directory(context, kind).listFiles(file -> file.isFile() &&
-                file.getName().endsWith("audio".equals(kind) ? ".m4a" : ".jpg"));
+                file.getName().endsWith("audio".equals(kind) ? ".m4a" :
+                        "photos".equals(kind) ? ".jpg" : ".mp4"));
         if (files == null) return new File[0];
         Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         return files;
@@ -62,9 +65,10 @@ public final class Store {
         try {
             int audio = mediaFiles(context, "audio").length;
             int photos = mediaFiles(context, "photos").length;
+            int videos = mediaFiles(context, "videos").length;
             String position = context.getSharedPreferences("position", Context.MODE_PRIVATE)
                     .getString("last", "尚無位置紀錄");
-            return "錄音檔：" + audio + "　照片：" + photos + "\n最近定位：" + position;
+            return "錄音檔：" + audio + "　照片：" + photos + "　影片：" + videos + "\n最近定位：" + position;
         } catch (RuntimeException ex) {
             android.util.Log.e("Record2", "Cannot show local file summary", ex);
             return "無法讀取本機資料，請檢查手機儲存空間";

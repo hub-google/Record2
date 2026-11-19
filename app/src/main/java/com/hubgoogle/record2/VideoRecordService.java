@@ -38,6 +38,7 @@ public final class VideoRecordService extends Service {
     private static final int NOTIFICATION_ID = 104;
     public static volatile boolean starting;
     public static volatile boolean running;
+    public static volatile boolean stopping;
     public static volatile String lastError = "";
 
     private HandlerThread cameraThread;
@@ -65,7 +66,7 @@ public final class VideoRecordService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (!START.equals(intent.getAction()) || starting || running) return START_NOT_STICKY;
+        if (!START.equals(intent.getAction()) || starting || running || stopping) return START_NOT_STICKY;
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
                 (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) {
@@ -266,9 +267,11 @@ public final class VideoRecordService extends Service {
         }
         running = false;
         starting = false;
+        stopping = false;
     }
 
     @Override public void onDestroy() {
+        stopping = true;
         closing = true;
         running = false;
         starting = false;
