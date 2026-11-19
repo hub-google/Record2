@@ -65,3 +65,13 @@
 - 原始隱形／無提示攝錄、跨所有 Android 實機的保證仍非可交付項目。
 
 - 追加持續檢查通知可見性的監控任務：啟用遠端工作階段後若使用者關閉 App／通知類別，遠端服務會停止，避免只檢查啟用當下的盲點。這項修正仍須完整模擬器驗收。
+
+
+## 2026-11-19 第二輪：新增授權式背景影片錄製（待最新驗收）
+
+- `VideoRecordService.java`：可見前景服務（`camera`），Camera2 + MediaRecorder、MP4 暫存、停止後完成檔案、通知停止動作。
+- `MainActivity.java`：獨立背景錄影控制、權限及開始前再次確認、失敗提示、和拍照互斥。
+- `Store.java`、`MediaLibraryActivity.java`：影片本機檔案清單、播放、匯出、刪除及影片數量。
+- `AndroidManifest.xml`：只新增必要的 `FOREGROUND_SERVICE_CAMERA` 權限與不可外部啟動的 `camera` 類型 Service。
+- `scripts/test-static.sh` 與 `scripts/emulator-video.sh`：新增結構檢查、背景錄影操作與 MP4 原子檢驗；保留原有功能回歸測試。
+- **驗收界線**：尚未跑出本次最新 CI 成果前不可宣稱影片實際可錄製；功能不含聲音，不包括秘密攝錄、通知隱藏或免授權遠端啟動。
