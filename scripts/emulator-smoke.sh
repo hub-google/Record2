@@ -132,7 +132,7 @@ print('PASS: six screenshots captured from Android emulator')
 PY
 
 # Regression: real playback, JPEG decode, and in-app file access.
-click_text '管理錄音與照片'
+click_text '管理錄音、照片與影片'
 sleep 2
 adb shell uiautomator dump /sdcard/window.xml >/dev/null
 adb shell cat /sdcard/window.xml | grep -q '錄音：1' || { echo 'Audio library did not show saved audio'; exit 1; }
