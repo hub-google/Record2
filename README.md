@@ -25,7 +25,7 @@
 | 安裝後不出現在 App 列表 | App 有正常啟動圖示與可見介面 | **未實作** |
 | 即時背景錄音 | 使用者在畫面手動授權並啟動麥克風前景服務，可切離介面；顯示通知與 Android 使用指示 | **部分符合，非隱藏錄音** |
 | 即時地理位置 | 使用者手動授權並啟動位置前景服務，定期記錄座標；受手機位置開關／省電影響 | **部分符合，非無提示** |
-| 背景開鏡頭 | 目前必須在可見相機畫面預覽、拍照；離開釋放鏡頭 | **未達成** |
+| 背景開鏡頭 | 經使用者在可見 App 確認後可啟動**無聲背景錄影**，在切離 App／短暫熄屏時繼續運作；相機預覽拍照仍須可見畫面 | **部分符合，非隱藏攝錄** |
 | 不發出任何提醒 | 使用 Android 權限對話框、前景服務通知與系統感測器指示 | **未達成** |
 | 實際測試、提供截圖 | GitHub Actions 的 Android 8、10、14、15 模擬器測試及 PNG 證據；未完成全機型實測 | **部分完成** |
 
@@ -36,6 +36,7 @@
 - **麥克風錄音**：前景服務、通知、停止與 AAC/M4A 儲存。
 - **定位**：前景服務、GPS／Network Provider、位置與時間事件紀錄。
 - **相機**：需可見預覽的拍照與 JPEG 儲存。
+- **背景錄影**：需從可見 App 主動開始、再次確認，使用可見 `camera` 前景服務錄製無聲 MP4；切至桌面或短暫鎖屏可繼續錄影，通知可直接停止。
 - **檔案**：播放、預覽、匯出（Storage Access Framework）、取消／確認刪除、本機事件。
 - **資料與安全**：無雲端帳號，資料預設留在 App 儲存目錄。遠端請求功能需手機使用者手動啟用，新增的網路權限僅用於手機 **127.0.0.1 本機回環介面**，預設不建立連線、不上傳音檔或位置。
 - **驗收**：測試計畫 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，實際測試證據 [docs/test-evidence/](docs/test-evidence/)，最新已成功執行的 [Android 15 完整操作與背景運作測試](https://github.com/hub-google/Record2/actions/runs/42569471579) 與 [Android 8／10／14 相容性測試](https://github.com/hub-google/Record2/actions/runs/42567323144)。
@@ -131,3 +132,12 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 - **此版本是純影像錄製，不包含麥克風聲音**，既有單獨的 M4A 錄音功能維持原樣。
 - Android 14+ 相機前景服務必須從**可見 App**啟動；Android 系統相機指示和通知不能規避。裝置耗電策略可能中止長時間錄影；不是全品牌保證。
 - 本輪新增 `scripts/emulator-video.sh`，驗證同意啟動、切 Home、短暫鎖屏、停止後 MP4、影片清單，併入 Android 15 CI。**程式碼提交不代表該 CI 已通過**，以 Actions 實際結果為準。
+
+
+## 2026-11-19 背景錄影實際驗收
+
+- [GitHub Actions Run 44501123406](https://github.com/hub-google/Record2/actions/runs/44501123406)：**SUCCESS**；Android 15／API 35 模擬器，含現有錄音、定位、拍照、匯出、權限拒絕、遠端授權／撤銷，以及新增的背景錄影。
+- 本次日誌列出 **31 項 PASS、0 項 FAIL**，包含明確開始錄影、切至 Android 桌面、短時間關閉螢幕、停止後 MP4 容器檢查與影片清單。
+- 影片證據：[錄影中](docs/test-evidence/20-video-recording.png)、[切至桌面](docs/test-evidence/21-video-background-home.png)、[錄影結束](docs/test-evidence/22-video-finished.png)、[影片清單](docs/test-evidence/23-video-library.png)。
+- 仍未驗證的部分：長時間鎖屏和省電限制、多品牌實機、影片播放完整性與匯出真實比對、前景通知欄停止動作的實際 UI 點擊、錄影中斷救援與分段自動修復。**不能推論任意 Android 版本和機型都能穩定運作。**
+- 依先前開發流程設定，Android 15 全套驗收工作流程完成此輪測試後恢復為 **`workflow_dispatch` 手動觸發**。

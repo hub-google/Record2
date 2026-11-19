@@ -75,3 +75,11 @@
 - `AndroidManifest.xml`：只新增必要的 `FOREGROUND_SERVICE_CAMERA` 權限與不可外部啟動的 `camera` 類型 Service。
 - `scripts/test-static.sh` 與 `scripts/emulator-video.sh`：新增結構檢查、背景錄影操作與 MP4 原子檢驗；保留原有功能回歸測試。
 - **驗收界線**：尚未跑出本次最新 CI 成果前不可宣稱影片實際可錄製；功能不含聲音，不包括秘密攝錄、通知隱藏或免授權遠端啟動。
+
+
+## 2026-11-19 最新整合驗收（由 CI 實際驗證）
+
+- `main` 的 [Actions Run 44501123406](https://github.com/hub-google/Record2/actions/runs/44501123406) 為 **SUCCESS**，含 Android 15 編譯及模擬器操作。
+- 新增的 **純影像背景錄影**：手機持有人明確啟動，Android 可見 `camera` 前景服務保持運作；切至桌面及短時間鎖屏後能停止並完成 MP4；在本機影片清單可見。CI 共 31 個 PASS 訊息，0 FAIL。
+- 這**不代表**背景偷拍、隱藏攝錄、無系統提示錄製、任意時刻遠端開相機、長時間任意機型錄影等原始條件能實現，也不代表完整音質與影片播放皆已實機驗收。
+- 完成單輪整合測試後，`android.yml` 恢復 `workflow_dispatch`，避免後續單純文件提交重跑整組模擬器。
