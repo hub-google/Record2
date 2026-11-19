@@ -43,6 +43,7 @@ assert 'SystemClock.elapsedRealtime()' in remote
 assert 'MAX_PENDING_REQUESTS' in remote
 assert 'notificationsAllowed' in remote and 'areNotificationsEnabled()' in remote
 assert 'getImportance()' in remote and 'isPending(String id)' in remote
+assert 'visibilityWatchdog' in remote and 'stopTimer.postDelayed(visibilityWatchdog' in remote
 main=(java/'MainActivity.java').read_text()
 assert 'remoteApprovalDialog' in main and 'setOnDismissListener' in main
 assert 'requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 204)' not in main

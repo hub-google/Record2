@@ -53,6 +53,18 @@ public final class RemoteControlService extends Service {
     private ServerSocket listener;
     private Thread worker;
     private final android.os.Handler stopTimer = new android.os.Handler(android.os.Looper.getMainLooper());
+    // Turning notifications off while this session runs must also disable remote requests.
+    private final Runnable visibilityWatchdog = new Runnable() {
+        @Override public void run() {
+            if (!accepting) return;
+            if (!notificationsAllowed(RemoteControlService.this)) {
+                Store.event(RemoteControlService.this, "remote_disabled", "Notifications blocked during session");
+                stopSelf();
+                return;
+            }
+            stopTimer.postDelayed(this, 3000);
+        }
+    };
 
     public static final class Request {
         public final String id;
@@ -212,6 +224,7 @@ public final class RemoteControlService extends Service {
             worker.start();
             Store.event(this, "remote_started", "Local-only requests, port " + PORT);
             stopTimer.postDelayed(this::stopSelf, BRIDGE_LIFETIME_MS);
+            stopTimer.postDelayed(visibilityWatchdog, 3000);
         } catch (Exception ex) {
             Store.event(this, "remote_error", ex.getClass().getSimpleName());
             Log.e("Record2", "Cannot start local request bridge", ex);
