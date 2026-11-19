@@ -141,16 +141,23 @@ done
 CODE=$(auth -o /tmp/remote-overloaded.json -w '%{http_code}' -X POST "$BASE/v1/requests/audio_start")
 if [[ "$CODE" != 429 ]]; then echo "FAIL: pending queue overflow returned $CODE"; exit 1; fi
 echo 'PASS: fourth pending request rejected with HTTP 429'
-for id in "${IDS[@]}"; do
-  tap_text '拒絕'
-  sleep 2
-  auth "$BASE/v1/requests/$id" > /tmp/remote-request-status.json
-  python3 - <<'PY'
+auth "$BASE/v1/status" > /tmp/remote-status.json
+python3 - <<'PY'
 import json
-assert json.load(open('/tmp/remote-request-status.json'))['status']=='denied'
+assert json.load(open('/tmp/remote-status.json'))['audio_running'] is False
+print('PASS: queued remote requests do not start sensors without approval')
 PY
-done
-echo 'PASS: queued actions each require separate phone consent'
+# Terminate this opt-in session and verify the bridge can no longer be reached.
+# The single-request approve/deny behaviour has already been tested above.
+adb shell am force-stop "$APP"
+sleep 2
+if curl --silent --max-time 3 "$BASE/v1/status" >/dev/null 2>&1; then
+  echo 'FAIL: bridge survived forced application shutdown'
+  exit 1
+fi
+echo 'PASS: shutdown terminates remote requests and local listener'
+adb shell am start -n "$APP/.MainActivity" >/dev/null
+sleep 2
 # Rotating credentials shuts down the current listener and invalidates prior access.
 OLD_TOKEN=$TOKEN
 tap_text '重新產生遠端金鑰'

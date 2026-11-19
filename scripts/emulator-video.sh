@@ -3,6 +3,9 @@ set -euo pipefail
 # Android 15 emulator: explicit consent, persistent camera foreground service,
 # screen lock, STOP action, finalized MP4 and user-visible library.
 APP=com.hubgoogle.record2
+# Permission denial regression ran earlier; restore permission for this opt-in test.
+adb shell pm grant "$APP" android.permission.CAMERA
+adb shell pm grant "$APP" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
 OUT=docs/test-evidence
 BASE=/sdcard/Android/data/$APP/files/videos
 mkdir -p "$OUT" /tmp/record2-videos
