@@ -5,7 +5,13 @@ set -euo pipefail
 APP=com.hubgoogle.record2
 OUT=docs/test-evidence
 mkdir -p "$OUT"
-adb shell am start -n "$APP/.MainActivity" >/dev/null
+# Previous tests may leave MediaLibraryActivity on top of the task.
+adb shell uiautomator dump /sdcard/record2-before-remote.xml >/dev/null 2>&1 || true
+if adb shell cat /sdcard/record2-before-remote.xml 2>/dev/null | grep -q '返回首頁'; then
+  adb shell input keyevent KEYCODE_BACK
+  sleep 1
+fi
+adb shell am start -W -n "$APP/.MainActivity" >/dev/null
 sleep 2
 adb shell input swipe 480 1500 480 520 450
 sleep 1

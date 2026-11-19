@@ -97,3 +97,6 @@ adb shell cat /sdcard/record2-video.xml | grep -q '影片：1 個' || {
 }
 adb exec-out screencap -p > "$OUT/23-video-library.png"
 echo 'PASS: MP4 appears in on-device video library'
+# Leave the media library before the next integration test.
+tap_text '返回首頁'
+sleep 1
