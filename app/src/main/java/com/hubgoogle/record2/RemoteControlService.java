@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
@@ -43,6 +44,7 @@ public final class RemoteControlService extends Service {
     private static final long BRIDGE_LIFETIME_MS = 15 * 60_000L;
     private static final String PREFS = "remote_access";
     private static final String CHANNEL = "record2_remote";
+    private static final int MAX_PENDING_REQUESTS = 3;
     private static final Object LOCK = new Object();
     private static final Map<String, Request> REQUESTS = new HashMap<>();
     public static volatile boolean running = false;
@@ -56,12 +58,13 @@ public final class RemoteControlService extends Service {
         public final String id;
         public final String action;
         public final long created;
-        public String status = "pending";
+        public volatile String status = "pending";
 
         Request(String id, String action) {
             this.id = id;
             this.action = action;
-            this.created = System.currentTimeMillis();
+            // Monotonic time: device clock changes must not extend consent.
+            this.created = SystemClock.elapsedRealtime();
         }
     }
 
@@ -108,6 +111,17 @@ public final class RemoteControlService extends Service {
         Store.event(context, "remote_token_rotated", "Local access token changed and requests revoked");
     }
 
+    /** Remote control requires visible notifications and an enabled notification channel. */
+    public static boolean notificationsAllowed(Context context) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) return false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
+        return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+    }
+
     /** Can only be called from app UI; the network server exposes no equivalent method. */
     public static boolean resolve(Context context, String id, boolean approved) {
         // Old notifications must never authorize work after the service was disabled.
@@ -116,7 +130,7 @@ public final class RemoteControlService extends Service {
         synchronized (LOCK) {
             request = REQUESTS.get(id);
             if (request == null || !"pending".equals(request.status)) return false;
-            if (System.currentTimeMillis() - request.created > REQUEST_LIFETIME_MS) {
+            if (SystemClock.elapsedRealtime() - request.created > REQUEST_LIFETIME_MS) {
                 request.status = "expired";
                 return false;
             }
@@ -129,7 +143,7 @@ public final class RemoteControlService extends Service {
 
     public static Request firstPending() {
         synchronized (LOCK) {
-            long now = System.currentTimeMillis();
+            long now = SystemClock.elapsedRealtime();
             Request earliest = null;
             for (Request request : REQUESTS.values()) {
                 if ("pending".equals(request.status) &&
@@ -138,6 +152,15 @@ public final class RemoteControlService extends Service {
                         (earliest == null || request.created < earliest.created)) earliest = request;
             }
             return earliest;
+        }
+    }
+
+    /** True only while the specific request can still be approved on the phone. */
+    public static boolean isPending(String id) {
+        synchronized (LOCK) {
+            Request request = REQUESTS.get(id);
+            return running && request != null && "pending".equals(request.status)
+                    && SystemClock.elapsedRealtime() - request.created <= REQUEST_LIFETIME_MS;
         }
     }
 
@@ -160,16 +183,13 @@ public final class RemoteControlService extends Service {
             return START_NOT_STICKY;
         }
         if (accepting) return START_NOT_STICKY;
-        // Explicitly-visible remote control must not run when the user has
-        // denied Android 13+ notifications, which would suppress its notice.
-        if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-                        PackageManager.PERMISSION_GRANTED) {
-            Store.event(this, "remote_denied", "Notification permission required for visible control");
+        createChannel();
+        // Runtime permission alone is not enough: users can disable app or channel notifications.
+        if (!notificationsAllowed(this)) {
+            Store.event(this, "remote_denied", "Visible notifications disabled");
             stopSelf();
             return START_NOT_STICKY;
         }
-        createChannel();
         try {
             Notification notice = new Notification.Builder(this, CHANNEL)
                     .setSmallIcon(android.R.drawable.ic_lock_lock)
@@ -275,11 +295,11 @@ public final class RemoteControlService extends Service {
                 int pending = 0;
                 for (Request entry : REQUESTS.values()) {
                     if ("pending".equals(entry.status) &&
-                            System.currentTimeMillis() - entry.created > REQUEST_LIFETIME_MS)
+                            SystemClock.elapsedRealtime() - entry.created > REQUEST_LIFETIME_MS)
                         entry.status = "expired";
                     if ("pending".equals(entry.status)) pending++;
                 }
-                if (pending >= 3) { respond(output, 429, error("Too many pending requests")); return; }
+                if (pending >= MAX_PENDING_REQUESTS) { respond(output, 429, error("Too many pending requests")); return; }
                 request = new Request(UUID.randomUUID().toString(), action);
                 REQUESTS.put(request.id, request);
                 // Limit retained history; status of evicted requests becomes unknown.
@@ -312,7 +332,7 @@ public final class RemoteControlService extends Service {
             synchronized (LOCK) {
                 request = REQUESTS.get(id);
                 if (request != null && "pending".equals(request.status) &&
-                        System.currentTimeMillis() - request.created > REQUEST_LIFETIME_MS) {
+                        SystemClock.elapsedRealtime() - request.created > REQUEST_LIFETIME_MS) {
                     request.status = "expired";
                 }
             }

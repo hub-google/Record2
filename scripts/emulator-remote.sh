@@ -33,10 +33,16 @@ PY
   cp /tmp/record2-remote-ui.xml "$OUT/17-remote-ui-failed.xml" || true
   exit 1
 }
-tap_text '啟用遠端請求'
-sleep 3
 adb forward tcp:8765 tcp:8765
 trap 'adb forward --remove tcp:8765 >/dev/null 2>&1 || true' EXIT
+BASE=http://127.0.0.1:8765
+if curl --silent --max-time 2 "$BASE/v1/status" >/dev/null 2>&1; then
+  echo 'FAIL: remote bridge was running before explicit enable'
+  exit 1
+fi
+echo 'PASS: remote bridge is off by default'
+tap_text '啟用遠端請求'
+sleep 3
 TOKEN=$(adb shell run-as "$APP" cat shared_prefs/remote_access.xml |
     python3 -c 'import re,sys;s=sys.stdin.read();m=re.search(r"[0-9a-f]{64}",s);print(m.group(0) if m else "")')
 if [[ $(printf %s "$TOKEN" | wc -c) -ne 64 ]]; then echo "FAIL: missing private access token"; exit 1; fi
@@ -126,6 +132,47 @@ if adb shell dumpsys activity activities | grep -q 'mResumedActivity.*CameraActi
   exit 1
 fi
 echo 'PASS: denied remote camera request did not open camera'
+# Pending queue is bounded; every request still needs separate on-device consent.
+IDS=()
+for n in 1 2 3; do
+  auth -X POST "$BASE/v1/requests/audio_start" > /tmp/remote-request.json
+  IDS+=("$(python3 -c 'import json;print(json.load(open("/tmp/remote-request.json"))["id"])')")
+done
+CODE=$(auth -o /tmp/remote-overloaded.json -w '%{http_code}' -X POST "$BASE/v1/requests/audio_start")
+if [[ "$CODE" != 429 ]]; then echo "FAIL: pending queue overflow returned $CODE"; exit 1; fi
+echo 'PASS: fourth pending request rejected with HTTP 429'
+for id in "${IDS[@]}"; do
+  tap_text '拒絕'
+  sleep 2
+  auth "$BASE/v1/requests/$id" > /tmp/remote-request-status.json
+  python3 - <<'PY'
+import json
+assert json.load(open('/tmp/remote-request-status.json'))['status']=='denied'
+PY
+done
+echo 'PASS: queued actions each require separate phone consent'
+# Rotating credentials shuts down the current listener and invalidates prior access.
+OLD_TOKEN=$TOKEN
+tap_text '重新產生遠端金鑰'
+tap_text '重新產生'
+sleep 2
+NEW_TOKEN=$(adb shell run-as "$APP" cat shared_prefs/remote_access.xml |
+    python3 -c 'import re,sys;s=sys.stdin.read();m=re.search(r"[0-9a-f]{64}",s);print(m.group(0) if m else "")')
+if [[ ${#NEW_TOKEN} -ne 64 || "$OLD_TOKEN" == "$NEW_TOKEN" ]]; then
+  echo 'FAIL: token rotation did not persist a new key'
+  exit 1
+fi
+tap_text '啟用遠端請求'
+sleep 3
+CODE=$(curl --silent --max-time 8 -o /tmp/remote-old-token.json -w '%{http_code}' -H "Authorization: Bearer $OLD_TOKEN" "$BASE/v1/status")
+if [[ "$CODE" != 401 ]]; then echo "FAIL: old token was not revoked ($CODE)"; exit 1; fi
+TOKEN=$NEW_TOKEN
+auth "$BASE/v1/status" > /tmp/remote-status.json
+python3 - <<'PY'
+import json
+assert json.load(open('/tmp/remote-status.json'))['connected'] is True
+PY
+echo 'PASS: rotating the token revokes the old credential'
 tap_text '關閉遠端請求'
 sleep 2
 if curl -sS --max-time 3 "$BASE/v1/status" >/dev/null 2>&1; then

@@ -36,6 +36,8 @@ public class MainActivity extends Activity {
     private Button remoteButton;
     private TextView remoteStatus;
     private boolean remotePromptShowing;
+    private AlertDialog remoteApprovalDialog;
+    private Runnable remoteApprovalTimer;
     private final Handler updates = new Handler(Looper.getMainLooper());
     private final Runnable updateTask = new Runnable() {
         @Override public void run() {
@@ -51,10 +53,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(navy);
         getWindow().setNavigationBarColor(navy);
         buildUi();
-        if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 204);
-        }
+        // Permission is requested only if the owner enables remote control.
     }
 
     private void buildUi() {
@@ -164,6 +163,10 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_REMOTE_NOTIFICATIONS);
             return;
         }
+        if (!RemoteControlService.notificationsAllowed(this)) {
+            toast("Record2 通知已被停用，請到 Android 設定開啟 App 通知與「遠端請求與核准」通知類別");
+            return;
+        }
         try {
             RemoteControlService.token(this);
             startForegroundService(new Intent(this, RemoteControlService.class)
@@ -219,24 +222,39 @@ public class MainActivity extends Activity {
         RemoteControlService.Request request = RemoteControlService.firstPending();
         if (request == null) return;
         remotePromptShowing = true;
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("允許遠端操作？")
-                .setMessage("此要求來自已連線的用戶端：\n\n" +
+                .setMessage("來自本機已連線用戶端的請求：\n\n" +
                         RemoteControlService.actionLabel(request.action) +
-                        "\n\n同意後仍會遵循 Android 系統權限及感測器提示；不同意將不執行任何操作。")
-                .setNegativeButton("拒絕", (d, which) -> {
-                    RemoteControlService.resolve(this, request.id, false);
-                    remotePromptShowing = false;
-                })
+                        "\n請求編號：" + request.id.substring(0, 8) +
+                        "\n\n請求只有 90 秒有效；同意後仍遵循 Android 權限與感測器提示。")
+                .setNegativeButton("拒絕", (d, which) ->
+                        RemoteControlService.resolve(this, request.id, false))
                 .setPositiveButton("同意並執行", (d, which) -> {
-                    boolean approved = RemoteControlService.resolve(this, request.id, true);
-                    remotePromptShowing = false;
-                    if (approved) executeApprovedRemoteAction(request.action);
+                    if (RemoteControlService.resolve(this, request.id, true)) {
+                        executeApprovedRemoteAction(request.action);
+                    } else toast("遠端請求已過期或撤銷，未執行操作");
                 })
-                .setOnCancelListener(d -> {
-                    RemoteControlService.resolve(this, request.id, false);
-                    remotePromptShowing = false;
-                }).show();
+                .setOnCancelListener(d -> RemoteControlService.resolve(this, request.id, false))
+                .create();
+        remoteApprovalDialog = dialog;
+        remoteApprovalTimer = new Runnable() {
+            @Override public void run() {
+                if (remoteApprovalDialog != dialog) return;
+                if (!RemoteControlService.isPending(request.id)) {
+                    dialog.dismiss();
+                    return;
+                }
+                updates.postDelayed(this, 1000);
+            }
+        };
+        dialog.setOnDismissListener(d -> {
+            if (remoteApprovalTimer != null) updates.removeCallbacks(remoteApprovalTimer);
+            if (remoteApprovalDialog == dialog) remoteApprovalDialog = null;
+            remotePromptShowing = false;
+        });
+        dialog.show();
+        updates.postDelayed(remoteApprovalTimer, 1000);
     }
 
     private void executeApprovedRemoteAction(String action) {
@@ -336,6 +354,13 @@ public class MainActivity extends Activity {
         updates.removeCallbacks(updateTask);
         super.onPause();
     }
+    @Override protected void onDestroy() {
+        updates.removeCallbacks(updateTask);
+        if (remoteApprovalTimer != null) updates.removeCallbacks(remoteApprovalTimer);
+        if (remoteApprovalDialog != null) remoteApprovalDialog.dismiss();
+        super.onDestroy();
+    }
+
     private void refresh() {
         audioStatus.setText(AudioRecordService.running ? "● 錄音進行中（有系統通知）" : "○ 未錄音");
         locationStatus.setText(LocationTrackService.running ? "● 持續定位中（有系統通知）" : "○ 未定位");
