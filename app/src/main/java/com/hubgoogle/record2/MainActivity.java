@@ -194,20 +194,16 @@ public class MainActivity extends Activity {
             toast("需要可見通知，請先在 Android 設定開啟 Record2 通知");
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("開始背景錄影？")
-                .setMessage("相機將持續錄影（無聲），即使切換 App 或關閉螢幕。Android 將顯示感測器指示和錄影通知，可從通知欄停止。請確認已取得拍攝場所及相關人員同意。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("開始錄影", (d, which) -> {
-                    try {
-                        startVisibleForegroundService(new Intent(this, VideoRecordService.class)
-                                .setAction(VideoRecordService.START));
-
-                    } catch (Exception ex) {
-                        toast("無法開始錄影：" + ex.getMessage());
-                    }
-                    videoButton.postDelayed(this::refresh, 900);
-                }).show();
+        // The clearly labeled button is the owner's start action.
+        // Do not show a redundant app-owned confirmation or success toast.
+        // Android runtime permission prompts and sensor indicators remain enabled.
+        try {
+            startVisibleForegroundService(new Intent(this, VideoRecordService.class)
+                    .setAction(VideoRecordService.START));
+        } catch (Exception ex) {
+            toast("無法開始錄影：" + ex.getMessage());
+        }
+        videoButton.postDelayed(this::refresh, 900);
     }
 
     private void toggleRemote() {

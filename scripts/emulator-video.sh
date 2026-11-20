@@ -39,9 +39,8 @@ PY
   cp /tmp/record2-video-ui.xml "$OUT/20-video-ui-failed.xml" || true
   exit 1
 }
+# The explicit start button begins recording directly; no second in-app dialog.
 tap_text '開始背景錄影'
-sleep 1
-tap_text '開始錄影'
 sleep 10
 adb exec-out screencap -p > "$OUT/20-video-recording.png"
 if ! adb shell dumpsys activity services "$APP" | grep -q 'VideoRecordService'; then
