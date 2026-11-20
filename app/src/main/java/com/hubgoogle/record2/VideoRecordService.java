@@ -262,8 +262,17 @@ public final class VideoRecordService extends Service {
             } else {
                 Store.event(this, "video_error", "影片檔案改名失敗：" + pendingFile.getName());
             }
-        } else if (pendingFile != null && pendingFile.exists() && !pendingFile.delete()) {
-            Store.event(this, "video_error", "未完成影片清除失敗");
+        } else if (pendingFile != null && pendingFile.exists()) {
+            // A failed recorder.stop() may leave valuable camera bytes.
+            // Do not silently destroy them or pretend that they form a valid MP4.
+            if (pendingFile.length() == 0) {
+                if (!pendingFile.delete()) {
+                    Store.event(this, "video_error", "空白暫存檔清除失敗");
+                }
+            } else {
+                Store.event(this, "video_incomplete",
+                        "未完成影片已保留，可在檔案管理匯出原始片段：" + pendingFile.getName());
+            }
         }
         running = false;
         starting = false;

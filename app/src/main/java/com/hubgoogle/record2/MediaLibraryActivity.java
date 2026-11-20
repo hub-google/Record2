@@ -47,6 +47,11 @@ public class MediaLibraryActivity extends Activity {
                 for (File file : Store.mediaFiles(this, category)) {
                     if (file.getName().equals(savedExportName)) { pendingExport = file; break; }
                 }
+                if (pendingExport == null && "videos".equals(category)) {
+                    for (File file : Store.incompleteVideos(this)) {
+                        if (file.getName().equals(savedExportName)) { pendingExport = file; break; }
+                    }
+                }
             }
         }
         ScrollView scroll = new ScrollView(this);
@@ -89,19 +94,62 @@ public class MediaLibraryActivity extends Activity {
         list.removeAllViews();
         try {
             File[] files = Store.mediaFiles(this, category);
-            TextView heading = label(("audio".equals(category) ? "錄音" : "photos".equals(category) ? "照片" : "影片") + "：" + files.length + " 個", 18);
+            TextView heading = label(("audio".equals(category) ? "錄音" :
+                    "photos".equals(category) ? "照片" : "影片") +
+                    "：" + files.length + " 個", 18);
             heading.setPadding(0, dp(20), 0, dp(8));
             list.addView(heading);
             if (files.length == 0) {
-                list.addView(label("目前沒有檔案", 14));
-                return;
+                list.addView(label("目前沒有已完成檔案", 14));
+            } else {
+                int count = Math.min(files.length, MAX_VISIBLE);
+                for (int index = 0; index < count; index++) addRow(files[index]);
+                if (files.length > count) list.addView(label("僅顯示最近 " + count + " 個檔案", 13));
             }
-            int count = Math.min(files.length, MAX_VISIBLE);
-            for (int i = 0; i < count; i++) addRow(files[i]);
-            if (files.length > count) list.addView(label("僅顯示最近 " + count + " 個檔案", 13));
+            // Never expose an actively written .partial file: wait until recording stops.
+            if ("videos".equals(category) &&
+                    !VideoRecordService.running && !VideoRecordService.starting &&
+                    !VideoRecordService.stopping) {
+                File[] unfinished = Store.incompleteVideos(this);
+                if (unfinished.length > 0) {
+                    TextView warning = label("未完成影片：" + unfinished.length +
+                            " 個（異常中斷，可能無法播放；可以匯出原始檔或刪除）", 15);
+                    warning.setPadding(0, dp(20), 0, dp(8));
+                    list.addView(warning);
+                    for (int index = 0; index < Math.min(unfinished.length, MAX_VISIBLE); index++) {
+                        addIncompleteRow(unfinished[index]);
+                    }
+                }
+            }
         } catch (RuntimeException ex) {
             list.addView(label("讀取檔案失敗：" + ex.getMessage(), 14));
         }
+    }
+
+    private void addIncompleteRow(File file) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(dp(10), dp(10), dp(10), dp(10));
+        row.addView(label(file.getName() + "（" + (file.length() / 1024) +
+                " KB；尚未完成，無法保證可播放）", 13));
+        LinearLayout actions = new LinearLayout(this);
+        Button export = button("匯出原始檔");
+        export.setOnClickListener(v -> exportFile(file));
+        actions.addView(export, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button delete = button("刪除");
+        delete.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle("刪除未完成片段？")
+                .setMessage(file.getName() + "\n刪除後無法復原，請先匯出需要的資料。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("刪除", (d, which) -> {
+                    if (file.delete()) {
+                        Store.event(this, "incomplete_video_deleted", file.getName());
+                        refresh();
+                    } else toast("未完成影片刪除失敗");
+                }).show());
+        actions.addView(delete, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        row.addView(actions);
+        list.addView(row);
     }
 
     private void addRow(File file) {
@@ -217,7 +265,8 @@ public class MediaLibraryActivity extends Activity {
         pendingExport = file;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType(file.getName().endsWith(".jpg") ? "image/jpeg" :
+        intent.setType(file.getName().endsWith(".partial") ? "application/octet-stream" :
+                file.getName().endsWith(".jpg") ? "image/jpeg" :
                 file.getName().endsWith(".mp4") ? "video/mp4" : "audio/mp4");
         intent.putExtra(Intent.EXTRA_TITLE, file.getName());
         try { startActivityForResult(intent, EXPORT_DOCUMENT); }

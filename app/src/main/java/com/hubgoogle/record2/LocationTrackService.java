@@ -20,6 +20,9 @@ public class LocationTrackService extends Service implements LocationListener {
     public static volatile boolean running = false;
     private LocationManager locationManager;
     private int subscribedProviders;
+    // Request frequent fixes while the user-visible location service is active.
+    // Android may throttle or batch actual callbacks depending on device settings.
+    private static final long REQUEST_INTERVAL_MS = 5_000L;
 
     @Override public IBinder onBind(Intent intent) { return null; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -37,7 +40,7 @@ public class LocationTrackService extends Service implements LocationListener {
         }
         try {
             if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(102, Notifications.active(this, "Record2 正在記錄位置", "每 30 秒／移動 25 公尺更新，點擊返回停止"),
+                startForeground(102, Notifications.active(this, "Record2 正在記錄位置", "約每 5 秒請求位置更新（依系統與訊號而定），點擊返回停止"),
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             } else {
                 startForeground(102, Notifications.active(this, "Record2 正在記錄位置", "點擊返回停止"));
@@ -45,11 +48,11 @@ public class LocationTrackService extends Service implements LocationListener {
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
             subscribedProviders = 0;
             if (fine && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000L, 25f, this, Looper.getMainLooper());
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, REQUEST_INTERVAL_MS, 0f, this, Looper.getMainLooper());
                 subscribedProviders++;
             }
             if ((fine || coarse) && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000L, 25f, this, Looper.getMainLooper());
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, REQUEST_INTERVAL_MS, 0f, this, Looper.getMainLooper());
                 subscribedProviders++;
             }
             if (subscribedProviders == 0) {
@@ -69,7 +72,10 @@ public class LocationTrackService extends Service implements LocationListener {
     @Override public void onLocationChanged(Location location) {
         String latLon = String.format(Locale.US, "%.6f, %.6f (±%.0fm)",
                 location.getLatitude(), location.getLongitude(), location.getAccuracy());
-        getSharedPreferences("position", MODE_PRIVATE).edit().putString("last", latLon).apply();
+        getSharedPreferences("position", MODE_PRIVATE).edit()
+                .putString("last", latLon)
+                .putLong("last_at", location.getTime() > 0 ? location.getTime() : System.currentTimeMillis())
+                .apply();
         Store.event(this, "location_point", latLon + " provider=" + location.getProvider());
     }
 

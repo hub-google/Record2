@@ -46,6 +46,15 @@ public final class Store {
         return files;
     }
 
+    /** Incomplete camera captures are retained for user inspection/export, not playback. */
+    public static File[] incompleteVideos(Context context) {
+        File[] files = directory(context, "videos").listFiles(file -> file.isFile() &&
+                file.getName().endsWith(".mp4.partial"));
+        if (files == null) return new File[0];
+        Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        return files;
+    }
+
     public static synchronized void event(Context context, String type, String detail) {
         try {
             JSONObject obj = new JSONObject();
@@ -66,9 +75,17 @@ public final class Store {
             int audio = mediaFiles(context, "audio").length;
             int photos = mediaFiles(context, "photos").length;
             int videos = mediaFiles(context, "videos").length;
-            String position = context.getSharedPreferences("position", Context.MODE_PRIVATE)
-                    .getString("last", "尚無位置紀錄");
-            return "錄音檔：" + audio + "　照片：" + photos + "　影片：" + videos + "\n最近定位：" + position;
+            android.content.SharedPreferences positions =
+                    context.getSharedPreferences("position", Context.MODE_PRIVATE);
+            String position = positions.getString("last", "尚無位置紀錄");
+            long lastAt = positions.getLong("last_at", 0L);
+            String updatedAt = lastAt <= 0 ? "" : "（" +
+                    new SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+                            .format(new Date(lastAt)) + "）";
+            int incomplete = incompleteVideos(context).length;
+            return "錄音檔：" + audio + "　照片：" + photos + "　影片：" + videos +
+                    (incomplete == 0 ? "" : "　未完成影片：" + incomplete) +
+                    "\n最近定位：" + position + updatedAt;
         } catch (RuntimeException ex) {
             android.util.Log.e("Record2", "Cannot show local file summary", ex);
             return "無法讀取本機資料，請檢查手機儲存空間";
