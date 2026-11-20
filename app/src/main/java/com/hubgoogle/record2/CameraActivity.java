@@ -99,11 +99,11 @@ public class CameraActivity extends Activity {
 
     private void openCamera() {
         if (!active || camera != null || opening || handler == null) return;
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.CAMERA)) {
             hint.setText("相機權限尚未授權");
             return;
         }
-        CameraManager manager = getSystemService(CameraManager.class);
+        CameraManager manager = PlatformCompat.cameraManager(this);
         try {
             cameraId = null;
             for (String id : manager.getCameraIdList()) {

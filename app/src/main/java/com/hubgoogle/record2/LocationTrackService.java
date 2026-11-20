@@ -31,8 +31,8 @@ public class LocationTrackService extends Service implements LocationListener {
             return START_NOT_STICKY;
         }
         if (!START.equals(intent.getAction()) || running) return START_NOT_STICKY;
-        boolean fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        boolean coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean fine = PlatformCompat.hasPermission(this, Manifest.permission.ACCESS_FINE_LOCATION);
+        boolean coarse = PlatformCompat.hasPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION);
         if (!fine && !coarse) {
             Store.event(this, "location_denied", "location permission absent");
             stopSelf();

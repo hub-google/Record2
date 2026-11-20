@@ -181,12 +181,12 @@ public class MainActivity extends Activity {
             videoButton.postDelayed(this::refresh, 600);
             return;
         }
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.CAMERA)) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_VIDEO_CAMERA);
             return;
         }
         if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                !PlatformCompat.hasPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_VIDEO_NOTIFICATIONS);
             return;
         }
@@ -218,7 +218,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                !PlatformCompat.hasPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
             toast("遠端服務需要顯示明確通知，請先允許通知權限");
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_REMOTE_NOTIFICATIONS);
             return;
@@ -349,7 +349,7 @@ public class MainActivity extends Activity {
             audioButton.postDelayed(this::refresh, 500);
             return;
         }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.RECORD_AUDIO)) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO);
             return;
         }
@@ -366,8 +366,8 @@ public class MainActivity extends Activity {
             locationButton.postDelayed(this::refresh, 500);
             return;
         }
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) &&
+                !PlatformCompat.hasPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
             return;
@@ -389,7 +389,7 @@ public class MainActivity extends Activity {
             toast("背景錄影運作中，請先停止錄影再開啟相機");
             return;
         }
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.CAMERA)) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
             return;
         }
@@ -401,7 +401,7 @@ public class MainActivity extends Activity {
         boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         if (code == REQUEST_AUDIO && granted) toggleAudio();
         else if (code == REQUEST_LOCATION && (granted ||
-                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) toggleLocation();
+                PlatformCompat.hasPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION))) toggleLocation();
         else if (code == REQUEST_CAMERA && granted) openCamera();
         else if (code == REQUEST_VIDEO_CAMERA && granted) toggleVideo();
         else if (code == REQUEST_VIDEO_NOTIFICATIONS && granted) toggleVideo();

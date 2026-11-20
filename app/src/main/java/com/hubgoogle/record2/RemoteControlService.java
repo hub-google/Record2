@@ -112,7 +112,7 @@ public final class RemoteControlService extends Service {
                 .edit().putString("token", replacement).commit()) {
             throw new IllegalStateException("Cannot rotate access token");
         }
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        NotificationManager manager = PlatformCompat.notificationManager(context);
         synchronized (LOCK) {
             for (Request request : REQUESTS.values()) {
                 if ("pending".equals(request.status)) request.status = "cancelled";
@@ -126,10 +126,9 @@ public final class RemoteControlService extends Service {
     /** Remote control requires visible notifications and an enabled notification channel. */
     public static boolean notificationsAllowed(Context context) {
         if (Build.VERSION.SDK_INT >= 33 &&
-                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) return false;
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null || !manager.areNotificationsEnabled()) return false;
+                !PlatformCompat.hasPermission(context, Manifest.permission.POST_NOTIFICATIONS)) return false;
+        NotificationManager manager = PlatformCompat.notificationManager(context);
+        if (!PlatformCompat.notificationsEnabled(context)) return false;
         if (Build.VERSION.SDK_INT < 26) return true;
         NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
         return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
@@ -213,7 +212,7 @@ public final class RemoteControlService extends Service {
                     .setContentText("僅監聽本機 127.0.0.1；每次感測器操作均需手機核准")
                     .setOngoing(true)
                     .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
-                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build();
+                            PlatformCompat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT))).build();
             if (Build.VERSION.SDK_INT >= 29) {
                 startForeground(NOTIFICATION_ID, notice, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             } else startForeground(NOTIFICATION_ID, notice);
@@ -239,7 +238,7 @@ public final class RemoteControlService extends Service {
 
     private void createChannel() {
         if (Build.VERSION.SDK_INT < 26) return;
-        NotificationManager manager = getSystemService(NotificationManager.class);
+        NotificationManager manager = PlatformCompat.notificationManager(this);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL,
                 "Record2 遠端請求與核准", NotificationManager.IMPORTANCE_HIGH));
     }
@@ -371,7 +370,7 @@ public final class RemoteControlService extends Service {
             if (request == null || !"pending".equals(request.status)) return;
             request.status = "expired";
         }
-        getSystemService(NotificationManager.class).cancel(id.hashCode());
+        PlatformCompat.notificationManager(this).cancel(id.hashCode());
         Store.event(this, "remote_expired", request.action);
     }
 
@@ -385,7 +384,7 @@ public final class RemoteControlService extends Service {
         Intent open = new Intent(this, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, req.id.hashCode(), open,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                PlatformCompat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL)
                 : new Notification.Builder(this);
@@ -395,7 +394,7 @@ public final class RemoteControlService extends Service {
                 .setContentText(actionLabel(req.action) + "：點擊開啟程式決定是否允許")
                 .setContentIntent(pending)
                 .setAutoCancel(true).build();
-        getSystemService(NotificationManager.class).notify(req.id.hashCode(), notice);
+        PlatformCompat.notificationManager(this).notify(req.id.hashCode(), notice);
     }
 
     private static JSONObject error(String message) throws Exception {
@@ -425,7 +424,7 @@ public final class RemoteControlService extends Service {
             try { listener.close(); } catch (Exception ignored) {}
             listener = null;
         }
-        NotificationManager manager = getSystemService(NotificationManager.class);
+        NotificationManager manager = PlatformCompat.notificationManager(this);
         synchronized (LOCK) {
             for (Request request : REQUESTS.values()) {
                 if ("pending".equals(request.status)) request.status = "cancelled";

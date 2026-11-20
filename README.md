@@ -151,3 +151,12 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 - 依使用者本輪指示，本次**只提交程式碼，不跑測試、不產生新版 APK**。先前 CI 成功僅適用於先前版本，不可視為本輪新修改已驗證。
 
 - 2026-11-20 另補 Android 7（API24）相容分支：舊版不要求通知頻道，從可見畫面以 `startService` 啟動；Android 8+ 則維持 `startForegroundService`。**本輪均未測試，不能宣稱 Android 7 已驗證可用。**
+
+
+## 2026-11-20：Android 5.0 相容性程式（尚未編譯或實測）
+
+- 本次針對「支援更多 Android 版本」，`minSdk` 從 Android 7（API 24）下修到 **Android 5.0（API 21）**。
+- 新增 `PlatformCompat.java` 統一處理舊版權限、通知可用性、相機和通知系統服務查詢、`PendingIntent` 標記。
+- `MainActivity`、`CameraActivity`、`AudioRecordService`、`LocationTrackService`、`VideoRecordService`、`RemoteControlService`、`Notifications` 採用相容層；Android 5.x 不會呼叫 Android 6 才引入的 `checkSelfPermission`，或 Android 7 才引入的 `areNotificationsEnabled`。
+- Android 5.x 的相機仍依賴 Camera2 硬體功能，**不保證所有機型都支援完整錄影**；Android 5 以前不支援。
+- **本輪依使用者要求不執行 Gradle／模擬器／GitHub Actions 測試，不能將本次程式提交視為相容性驗收通過。**

@@ -53,8 +53,8 @@ public final class VideoRecordService extends Service {
     private boolean recorderStarted;
 
     public static boolean notificationsAllowed(Context context) {
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        NotificationManager manager = PlatformCompat.notificationManager(context);
+        if (!PlatformCompat.notificationsEnabled(context)) return false;
         if (Build.VERSION.SDK_INT < 26) return true;
         NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
         return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
@@ -68,13 +68,13 @@ public final class VideoRecordService extends Service {
             return START_NOT_STICKY;
         }
         if (!START.equals(intent.getAction()) || starting || running || stopping) return START_NOT_STICKY;
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.CAMERA) ||
                 (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) {
+                !PlatformCompat.hasPermission(this, Manifest.permission.POST_NOTIFICATIONS))) {
             fail("相機或可見通知未授權");
             return START_NOT_STICKY;
         }
-        NotificationManager manager = getSystemService(NotificationManager.class);
+        NotificationManager manager = PlatformCompat.notificationManager(this);
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 背景錄影",
                     NotificationManager.IMPORTANCE_DEFAULT));
@@ -107,10 +107,10 @@ public final class VideoRecordService extends Service {
     private Notification notification() {
         Intent open = new Intent(this, MainActivity.class);
         PendingIntent openIntent = PendingIntent.getActivity(this, 104, open,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                PlatformCompat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
         Intent stop = new Intent(this, VideoRecordService.class).setAction(STOP);
         PendingIntent stopIntent = PendingIntent.getService(this, 105, stop,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                PlatformCompat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL)
                 : new Notification.Builder(this);
@@ -127,7 +127,7 @@ public final class VideoRecordService extends Service {
     private void prepareCamera() {
         if (closing) return;
         try {
-            CameraManager manager = getSystemService(CameraManager.class);
+            CameraManager manager = PlatformCompat.cameraManager(this);
             if (manager == null) throw new IllegalStateException("找不到相機管理服務");
             String selectedId = null;
             for (String id : manager.getCameraIdList()) {

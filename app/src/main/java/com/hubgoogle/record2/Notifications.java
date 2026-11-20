@@ -12,14 +12,14 @@ public final class Notifications {
     private static final String CHANNEL = "record2_active";
     private Notifications() {}
     public static Notification active(Context c, String title, String message) {
-        NotificationManager manager = c.getSystemService(NotificationManager.class);
+        NotificationManager manager = PlatformCompat.notificationManager(c);
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 正在使用感測器",
                     NotificationManager.IMPORTANCE_LOW));
         }
         Intent intent = new Intent(c, MainActivity.class);
         PendingIntent pending = PendingIntent.getActivity(c, 0, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                PlatformCompat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(c, CHANNEL) : new Notification.Builder(c);
         return builder.setContentTitle(title).setContentText(message)

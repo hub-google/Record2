@@ -29,3 +29,8 @@
 Android 感測器提示與通知並非普通 App 可以保證隱藏的內容；此專案只開發由裝置持有人明確啟用、可見且可停止的感測紀錄功能，不實作隱身監控或遠端未經授權攝錄。
 
 - `app/build.gradle` 最低 API 調整為 24；`MainActivity.java`、`Notifications.java`、`VideoRecordService.java`、`RemoteControlService.java` 處理 API 24–25 不支援通知頻道、背景服務啟動 API 差異。此為相容性程式碼調整，**未經編譯／操作測試**。
+
+
+## 2026-11-20：Android 5.0 兼容層（未執行測試）
+
+本輪選定「**擴大 Android 版本相容性**」一項實作。新增 `PlatformCompat` 解決 Android 5.x 與 Android 6+ 的權限檢查、系統服務查詢、通知 API 及不可變 PendingIntent 的平台差異，並把最低 API 改為 21。**尚無 Android 5 執行證據**，也未涵蓋 Android 4.x 或各品牌實機限制。此改動不改變原始隱形／無提示條件仍未達成的事實。

@@ -25,7 +25,7 @@ public class AudioRecordService extends Service {
             return START_NOT_STICKY;
         }
         if (!START.equals(intent.getAction()) || running) return START_NOT_STICKY;
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!PlatformCompat.hasPermission(this, Manifest.permission.RECORD_AUDIO)) {
             Store.event(this, "audio_denied", "microphone permission absent");
             stopSelf();
             return START_NOT_STICKY;
