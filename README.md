@@ -160,3 +160,11 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 - `MainActivity`、`CameraActivity`、`AudioRecordService`、`LocationTrackService`、`VideoRecordService`、`RemoteControlService`、`Notifications` 採用相容層；Android 5.x 不會呼叫 Android 6 才引入的 `checkSelfPermission`，或 Android 7 才引入的 `areNotificationsEnabled`。
 - Android 5.x 的相機仍依賴 Camera2 硬體功能，**不保證所有機型都支援完整錄影**；Android 5 以前不支援。
 - **本輪依使用者要求不執行 Gradle／模擬器／GitHub Actions 測試，不能將本次程式提交視為相容性驗收通過。**
+
+
+## 2026-11-20：減少 App 非必要操作提示（未執行測試）
+
+- 錄音、定位、背景錄影與遠端請求的日常開始／停止，不再額外彈出「正在啟動」、「已要求停止」等重複 Toast；使用者仍能從主畫面狀態與 Android 系統通知看到目前動作。
+- 拍照成功改成頁面內提示，不額外顯示 Toast；播放錄音的開始／停止／自然結束不再顯示重複 Toast。
+- **保留必要提醒**：Android 系統權限要求、麥克風／相機指示、前景服務通知、開始背景錄影的明確同意、遠端操作核准、操作失敗與權限異常提示。
+- 這次是減少**非必要 App 提示**，**不是**「完全沒有通知或提示」，更不是背景隱形攝錄。此輪只提交 GitHub main 原始碼，依先前指示暫不測試。

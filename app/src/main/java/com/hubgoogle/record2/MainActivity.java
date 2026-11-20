@@ -177,7 +177,7 @@ public class MainActivity extends Activity {
         }
         if (VideoRecordService.running || VideoRecordService.starting) {
             stopService(new Intent(this, VideoRecordService.class));
-            toast("正在結束並儲存影片");
+
             videoButton.postDelayed(this::refresh, 600);
             return;
         }
@@ -202,7 +202,7 @@ public class MainActivity extends Activity {
                     try {
                         startVisibleForegroundService(new Intent(this, VideoRecordService.class)
                                 .setAction(VideoRecordService.START));
-                        toast("正在啟動錄影，請確認通知已出現");
+
                     } catch (Exception ex) {
                         toast("無法開始錄影：" + ex.getMessage());
                     }
@@ -213,7 +213,7 @@ public class MainActivity extends Activity {
     private void toggleRemote() {
         if (RemoteControlService.running) {
             stopService(new Intent(this, RemoteControlService.class));
-            toast("已要求關閉遠端請求");
+
             remoteButton.postDelayed(this::refresh, 500);
             return;
         }
@@ -231,7 +231,7 @@ public class MainActivity extends Activity {
             RemoteControlService.token(this);
             startVisibleForegroundService(new Intent(this, RemoteControlService.class)
                     .setAction(RemoteControlService.START));
-            toast("正在啟動本機遠端請求服務");
+
         } catch (Exception ex) {
             toast("遠端請求無法啟動：" + ex.getMessage());
         }
@@ -345,7 +345,7 @@ public class MainActivity extends Activity {
     private void toggleAudio() {
         if (AudioRecordService.running) {
             stopService(new Intent(this, AudioRecordService.class));
-            toast("已要求停止錄音");
+
             audioButton.postDelayed(this::refresh, 500);
             return;
         }
@@ -354,7 +354,7 @@ public class MainActivity extends Activity {
             return;
         }
         Intent start = new Intent(this, AudioRecordService.class).setAction(AudioRecordService.START);
-        try { startVisibleForegroundService(start); toast("正在啟動錄音"); }
+        try { startVisibleForegroundService(start); }
         catch (Exception ex) { toast("無法啟動錄音：" + ex.getMessage()); }
         audioButton.postDelayed(this::refresh, 600);
     }
@@ -362,7 +362,7 @@ public class MainActivity extends Activity {
     private void toggleLocation() {
         if (LocationTrackService.running) {
             stopService(new Intent(this, LocationTrackService.class));
-            toast("已要求停止定位");
+
             locationButton.postDelayed(this::refresh, 500);
             return;
         }
@@ -379,7 +379,7 @@ public class MainActivity extends Activity {
             return;
         }
         Intent start = new Intent(this, LocationTrackService.class).setAction(LocationTrackService.START);
-        try { startVisibleForegroundService(start); toast("正在啟動定位"); }
+        try { startVisibleForegroundService(start); }
         catch (Exception ex) { toast("無法啟動定位：" + ex.getMessage()); }
         locationButton.postDelayed(this::refresh, 600);
     }

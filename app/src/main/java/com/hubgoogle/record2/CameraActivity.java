@@ -172,7 +172,7 @@ public class CameraActivity extends Activity {
                     runOnUiThread(() -> {
                         if (active) {
                             captureButton.setEnabled(true);
-                            Toast.makeText(this, "照片已儲存", Toast.LENGTH_SHORT).show();
+                            hint.setText("照片已儲存 · 可以繼續拍照");
                         }
                     });
                 } catch (Exception e) {

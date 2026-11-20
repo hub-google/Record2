@@ -191,14 +191,14 @@ public class MediaLibraryActivity extends Activity {
     }
 
     private void togglePlayback(File file) {
-        if (file.equals(playingFile) && player != null) { stopPlayback(); toast("已停止播放"); return; }
+        if (file.equals(playingFile) && player != null) { stopPlayback(); return; }
         stopPlayback();
         try {
             player = new MediaPlayer();
             player.setDataSource(file.getAbsolutePath());
             playingFile = file;
-            player.setOnPreparedListener(mp -> { mp.start(); toast("正在播放：" + file.getName()); });
-            player.setOnCompletionListener(mp -> { stopPlayback(); toast("播放結束"); });
+            player.setOnPreparedListener(mp -> mp.start());
+            player.setOnCompletionListener(mp -> stopPlayback());
             player.setOnErrorListener((mp, what, extra) -> { stopPlayback(); toast("音檔無法播放"); return true; });
             player.prepareAsync();
         } catch (Exception ex) { stopPlayback(); toast("音檔無法開啟：" + ex.getMessage()); }
