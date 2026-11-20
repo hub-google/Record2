@@ -13,8 +13,10 @@ public final class Notifications {
     private Notifications() {}
     public static Notification active(Context c, String title, String message) {
         NotificationManager manager = c.getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 正在使用感測器",
-                NotificationManager.IMPORTANCE_LOW));
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 正在使用感測器",
+                    NotificationManager.IMPORTANCE_LOW));
+        }
         Intent intent = new Intent(c, MainActivity.class);
         PendingIntent pending = PendingIntent.getActivity(c, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

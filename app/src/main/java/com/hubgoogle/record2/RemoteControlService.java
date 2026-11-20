@@ -130,6 +130,7 @@ public final class RemoteControlService extends Service {
                         != PackageManager.PERMISSION_GRANTED) return false;
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT < 26) return true;
         NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
         return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
@@ -203,7 +204,10 @@ public final class RemoteControlService extends Service {
             return START_NOT_STICKY;
         }
         try {
-            Notification notice = new Notification.Builder(this, CHANNEL)
+            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(this, CHANNEL)
+                    : new Notification.Builder(this);
+            Notification notice = builder
                     .setSmallIcon(android.R.drawable.ic_lock_lock)
                     .setContentTitle("Record2 遠端請求已啟用")
                     .setContentText("僅監聽本機 127.0.0.1；每次感測器操作均需手機核准")
@@ -234,6 +238,7 @@ public final class RemoteControlService extends Service {
     }
 
     private void createChannel() {
+        if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL,
                 "Record2 遠端請求與核准", NotificationManager.IMPORTANCE_HIGH));
@@ -381,7 +386,10 @@ public final class RemoteControlService extends Service {
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, req.id.hashCode(), open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notice = new Notification.Builder(this, CHANNEL)
+        Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL)
+                : new Notification.Builder(this);
+        Notification notice = builder
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentTitle("Record2 遠端操作待核准")
                 .setContentText(actionLabel(req.action) + "：點擊開啟程式決定是否允許")

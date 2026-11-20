@@ -55,6 +55,7 @@ public final class VideoRecordService extends Service {
     public static boolean notificationsAllowed(Context context) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT < 26) return true;
         NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
         return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
@@ -74,8 +75,10 @@ public final class VideoRecordService extends Service {
             return START_NOT_STICKY;
         }
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 背景錄影",
-                NotificationManager.IMPORTANCE_DEFAULT));
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Record2 背景錄影",
+                    NotificationManager.IMPORTANCE_DEFAULT));
+        }
         if (!notificationsAllowed(this)) {
             fail("Android 通知已停用");
             return START_NOT_STICKY;
@@ -108,8 +111,10 @@ public final class VideoRecordService extends Service {
         Intent stop = new Intent(this, VideoRecordService.class).setAction(STOP);
         PendingIntent stopIntent = PendingIntent.getService(this, 105, stop,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        return new Notification.Builder(this, CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
+        Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL)
+                : new Notification.Builder(this);
+        return builder.setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle("Record2 正在使用相機錄影")
                 .setContentText("錄影可能持續於其他 App／螢幕關閉時。點擊停止即可儲存影片。")
                 .setContentIntent(openIntent)

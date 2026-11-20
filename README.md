@@ -77,7 +77,7 @@ gradle :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Android 8.0 (API 26) 至目標 Android 15 (API 35)。首次按各功能時依照 Android 提示授權；定位需開啟手機位置服務。
+Android 7.0 (API 24) 起可安裝（2026-11-20 降低 minSdk，**未在 Android 7 真機／模擬器編譯驗證**），編譯目標為 Android 15 (API 35)。首次按各功能時依照 Android 提示授權；定位需開啟手機位置服務。
 
 ## 測試與截圖
 
@@ -149,3 +149,5 @@ CI 執行與實機測試結果應以 GitHub Actions 實際紀錄為準；倘若�
 - 影片異常停止／無法完成 MP4 時，不再直接刪除非空的 `.mp4.partial`；可在影片清單看到「未完成影片」並選擇匯出原始片段或刪除，不假裝它是可播放 MP4，也**沒有**保證修復影片。
 - 原有正常停止錄影與完成 MP4、播放、匯出和刪除介面保留。
 - 依使用者本輪指示，本次**只提交程式碼，不跑測試、不產生新版 APK**。先前 CI 成功僅適用於先前版本，不可視為本輪新修改已驗證。
+
+- 2026-11-20 另補 Android 7（API24）相容分支：舊版不要求通知頻道，從可見畫面以 `startService` 啟動；Android 8+ 則維持 `startForegroundService`。**本輪均未測試，不能宣稱 Android 7 已驗證可用。**

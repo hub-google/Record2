@@ -164,6 +164,12 @@ public class MainActivity extends Activity {
         refresh();
     }
 
+    /** Android 7 uses startService; Android 8+ requires startForegroundService. */
+    private void startVisibleForegroundService(Intent intent) {
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent);
+        else startService(intent);
+    }
+
     private void toggleVideo() {
         if (VideoRecordService.stopping) {
             toast("正在完成上一段錄影，請稍後再開始");
@@ -194,7 +200,7 @@ public class MainActivity extends Activity {
                 .setNegativeButton("取消", null)
                 .setPositiveButton("開始錄影", (d, which) -> {
                     try {
-                        startForegroundService(new Intent(this, VideoRecordService.class)
+                        startVisibleForegroundService(new Intent(this, VideoRecordService.class)
                                 .setAction(VideoRecordService.START));
                         toast("正在啟動錄影，請確認通知已出現");
                     } catch (Exception ex) {
@@ -223,7 +229,7 @@ public class MainActivity extends Activity {
         }
         try {
             RemoteControlService.token(this);
-            startForegroundService(new Intent(this, RemoteControlService.class)
+            startVisibleForegroundService(new Intent(this, RemoteControlService.class)
                     .setAction(RemoteControlService.START));
             toast("正在啟動本機遠端請求服務");
         } catch (Exception ex) {
@@ -348,7 +354,7 @@ public class MainActivity extends Activity {
             return;
         }
         Intent start = new Intent(this, AudioRecordService.class).setAction(AudioRecordService.START);
-        try { startForegroundService(start); toast("正在啟動錄音"); }
+        try { startVisibleForegroundService(start); toast("正在啟動錄音"); }
         catch (Exception ex) { toast("無法啟動錄音：" + ex.getMessage()); }
         audioButton.postDelayed(this::refresh, 600);
     }
@@ -373,7 +379,7 @@ public class MainActivity extends Activity {
             return;
         }
         Intent start = new Intent(this, LocationTrackService.class).setAction(LocationTrackService.START);
-        try { startForegroundService(start); toast("正在啟動定位"); }
+        try { startVisibleForegroundService(start); toast("正在啟動定位"); }
         catch (Exception ex) { toast("無法啟動定位：" + ex.getMessage()); }
         locationButton.postDelayed(this::refresh, 600);
     }
