@@ -38,6 +38,11 @@ video=(java/'VideoRecordService.java').read_text()
 assert 'MediaRecorder.VideoSource.SURFACE' in video
 assert 'FOREGROUND_SERVICE_TYPE_CAMERA' in video
 assert 'setOngoing(true)' in video and '停止錄影' in video
+assert 'requestStop();' in video
+assert 'setAction(VideoRecordService.STOP)' in (java/'MainActivity.java').read_text()
+assert 'activeWithStop(' in (java/'AudioRecordService.java').read_text()
+assert 'activeWithStop(' in (java/'LocationTrackService.java').read_text()
+assert 'mostRecentElapsedNanos' in (java/'LocationTrackService.java').read_text()
 assert '"video_start"' not in (java/'RemoteControlService.java').read_text()
 assert '".partial"' in video
 assert 'START_NOT_STICKY' in video

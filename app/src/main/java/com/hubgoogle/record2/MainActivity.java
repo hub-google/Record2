@@ -176,8 +176,13 @@ public class MainActivity extends Activity {
             return;
         }
         if (VideoRecordService.running || VideoRecordService.starting) {
-            stopService(new Intent(this, VideoRecordService.class));
-
+            // Ask the existing service to finish its MP4 before exiting.
+            try {
+                startService(new Intent(this, VideoRecordService.class)
+                        .setAction(VideoRecordService.STOP));
+            } catch (Exception ex) {
+                toast("無法停止錄影：" + ex.getMessage());
+            }
             videoButton.postDelayed(this::refresh, 600);
             return;
         }

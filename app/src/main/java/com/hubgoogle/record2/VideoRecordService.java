@@ -64,7 +64,8 @@ public final class VideoRecordService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null || STOP.equals(intent.getAction())) {
-            stopSelf();
+            // Complete the MP4 on the camera thread before stopping this service.
+            requestStop();
             return START_NOT_STICKY;
         }
         if (!START.equals(intent.getAction()) || starting || running || stopping) return START_NOT_STICKY;
@@ -235,7 +236,30 @@ public final class VideoRecordService extends Service {
     private void fail(String message) {
         lastError = message;
         Store.event(this, "video_error", message);
-        stopSelf();
+        requestStop();
+    }
+
+    /** Serializes video file finalization before foreground-service shutdown. */
+    private synchronized void requestStop() {
+        if (closing) return;
+        closing = true;
+        stopping = true;
+        starting = false;
+        running = false;
+        Handler handler = cameraHandler;
+        if (handler != null && handler.post(this::finishAndStop)) return;
+        finishAndStop();
+    }
+
+    private void finishAndStop() {
+        try {
+            finishRecording();
+        } finally {
+            HandlerThread thread = cameraThread;
+            if (thread != null) thread.quitSafely();
+            Store.event(this, "video_stopped", "Camera foreground session stopped");
+            stopSelf();
+        }
     }
 
     private void finishRecording() {
@@ -285,21 +309,24 @@ public final class VideoRecordService extends Service {
     }
 
     @Override public void onDestroy() {
-        stopping = true;
-        closing = true;
-        running = false;
-        starting = false;
-        Handler handler = cameraHandler;
-        HandlerThread thread = cameraThread;
-        if (handler != null) {
-            handler.post(() -> {
+        // Normal STOP reaches onDestroy only after the MP4 has been finalized.
+        // Unexpected OS teardown still tries best-effort cleanup.
+        if (!closing) {
+            closing = true;
+            stopping = true;
+            running = false;
+            starting = false;
+            Handler handler = cameraHandler;
+            HandlerThread thread = cameraThread;
+            Runnable cleanup = () -> {
                 try { finishRecording(); }
-                finally { if (thread != null) thread.quitSafely(); }
-            });
-        } else {
-            finishRecording();
+                finally {
+                    if (thread != null) thread.quitSafely();
+                    Store.event(this, "video_stopped", "Unexpected service teardown");
+                }
+            };
+            if (handler == null || !handler.post(cleanup)) cleanup.run();
         }
-        Store.event(this, "video_stopped", "Camera foreground session stopped");
         super.onDestroy();
     }
 }

@@ -32,10 +32,12 @@ public class AudioRecordService extends Service {
         }
         try {
             if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(101, Notifications.active(this, "Record2 正在錄音", "點擊返回程式停止錄音"),
+                startForeground(101, Notifications.activeWithStop(this, "Record2 正在錄音", "點擊停止可儲存音檔",
+                        AudioRecordService.class, STOP, 201),
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
             } else {
-                startForeground(101, Notifications.active(this, "Record2 正在錄音", "點擊返回程式停止錄音"));
+                startForeground(101, Notifications.activeWithStop(this, "Record2 正在錄音", "點擊停止可儲存音檔",
+                        AudioRecordService.class, STOP, 201));
             }
             currentFile = Store.newFile(this, "audio", ".m4a");
             recorder = Build.VERSION.SDK_INT >= 31 ? new MediaRecorder(this) : new MediaRecorder();
